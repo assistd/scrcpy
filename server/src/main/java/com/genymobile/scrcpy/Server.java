@@ -5,6 +5,9 @@ import android.media.MediaCodecInfo;
 import android.os.BatteryManager;
 import android.os.Build;
 
+import com.genymobile.scrcpy.udt.UdtOption;
+import com.genymobile.scrcpy.udt.UdtServer;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
@@ -62,6 +65,14 @@ public final class Server {
 
     private static void scrcpy(Options options) throws IOException {
         Ln.i("Device: " + Build.MANUFACTURER + " " + Build.MODEL + " (Android " + Build.VERSION.RELEASE + ")");
+        //*/ tencent.kiwimchen. 20220606, support udt action
+        if (UdtOption.SUPPORT) {
+            if (UdtServer.scrcpy(options)) {
+                return;
+            }
+        }
+        //*/
+
         final Device device = new Device(options);
         List<CodecOption> codecOptions = options.getCodecOptions();
 
@@ -113,6 +124,7 @@ public final class Server {
             }
         }
     }
+
 
     private static Thread startInitThread(final Options options) {
         Thread thread = new Thread(new Runnable() {
@@ -178,6 +190,11 @@ public final class Server {
             }
             String key = arg.substring(0, equalIndex);
             String value = arg.substring(equalIndex + 1);
+            //*/ tencent.kiwimchen. 20220606, support udt action
+            if (UdtOption.createOptions(key, value)) {
+                continue;
+            }
+            //*/
             switch (key) {
                 case "log_level":
                     Ln.Level level = Ln.Level.valueOf(value.toUpperCase(Locale.ENGLISH));
@@ -334,4 +351,5 @@ public final class Server {
 
         scrcpy(options);
     }
+
 }

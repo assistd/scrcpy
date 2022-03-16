@@ -26,6 +26,11 @@ public final class Workarounds {
         //   "Attempt to read from field 'android.os.MessageQueue android.os.Looper.mQueue'
         //    on a null object reference"
         // <https://github.com/Genymobile/scrcpy/issues/921>
+        //*/ tencent.kiwimchen. 20220606, support udt action
+        if (Looper.getMainLooper() != null) {
+            return;
+        }
+        //*/
         Looper.prepareMainLooper();
     }
 

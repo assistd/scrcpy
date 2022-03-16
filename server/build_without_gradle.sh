@@ -22,6 +22,7 @@ CLASSES_DIR="$BUILD_DIR/classes"
 SERVER_DIR=$(dirname "$0")
 SERVER_BINARY=scrcpy-server
 ANDROID_JAR="$ANDROID_HOME/platforms/android-$PLATFORM/android.jar"
+JPEG_JAR="$(realpath .)/libs/turbojpeg.jar"
 
 echo "Platform: android-$PLATFORM"
 echo "Build-tools: $BUILD_TOOLS"
@@ -48,9 +49,10 @@ cd "$SERVER_DIR/src/main/aidl"
 
 echo "Compiling java sources..."
 cd ../java
-javac -bootclasspath "$ANDROID_JAR" -cp "$CLASSES_DIR" -d "$CLASSES_DIR" \
+javac -bootclasspath "$ANDROID_JAR"  -cp "$CLASSES_DIR":"$JPEG_JAR"  -d "$CLASSES_DIR" \
     -source 1.8 -target 1.8 \
     com/genymobile/scrcpy/*.java \
+    com/genymobile/scrcpy/udt/*.java \
     com/genymobile/scrcpy/wrappers/*.java
 
 echo "Dexing..."
@@ -64,7 +66,9 @@ then
         android/view/*.class \
         android/content/*.class \
         com/genymobile/scrcpy/*.class \
-        com/genymobile/scrcpy/wrappers/*.class
+        com/genymobile/scrcpy/udt/*.class \
+        com/genymobile/scrcpy/wrappers/*.class \
+        "$JPEG_JAR"
 
     echo "Archiving..."
     cd "$BUILD_DIR"
@@ -72,11 +76,12 @@ then
     rm -rf classes.dex classes
 else
     # use d8
-    "$ANDROID_HOME/build-tools/$BUILD_TOOLS/d8" --classpath "$ANDROID_JAR" \
+    "$ANDROID_HOME/build-tools/$BUILD_TOOLS/d8" --classpath "$ANDROID_JAR" --lib "$JPEG_JAR" \
         --output "$BUILD_DIR/classes.zip" \
         android/view/*.class \
         android/content/*.class \
         com/genymobile/scrcpy/*.class \
+        com/genymobile/scrcpy/udt/*.class \
         com/genymobile/scrcpy/wrappers/*.class
 
     cd "$BUILD_DIR"

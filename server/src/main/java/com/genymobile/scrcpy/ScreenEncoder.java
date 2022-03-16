@@ -1,5 +1,8 @@
 package com.genymobile.scrcpy;
 
+import com.genymobile.scrcpy.udt.UdtDevice;
+import com.genymobile.scrcpy.udt.UdtEncoder;
+import com.genymobile.scrcpy.udt.UdtOption;
 import com.genymobile.scrcpy.wrappers.SurfaceControl;
 
 import android.graphics.Rect;
@@ -78,9 +81,17 @@ public class ScreenEncoder implements Device.RotationListener {
         MediaFormat format = createFormat(bitRate, maxFps, codecOptions);
         device.setRotationListener(this);
         boolean alive;
+        //*/ tencent.kiwimchen. 20220606, support udt action
+        if (UdtOption.SUPPORT) {
+            udtDevice = UdtDevice.Combiner.get(device);
+        }
+        //*/
         try {
             do {
                 MediaCodec codec = createCodec(encoderName);
+                //*/ tencent.kiwimchen. 20220606, support udt action
+                if (udtDevice != null) { udtDevice.getUdtEncoder().onInit(codec); }
+                //*/
                 IBinder display = createDisplay();
                 ScreenInfo screenInfo = device.getScreenInfo();
                 Rect contentRect = screenInfo.getContentRect();
@@ -125,6 +136,12 @@ public class ScreenEncoder implements Device.RotationListener {
                     if (surface != null) {
                         surface.release();
                     }
+
+                    //*/ tencent.kiwimchen. 20220606, support udt action
+                    if (udtDevice != null && udtDevice.getUdtEncoder().onFinish(fd)) {
+                        alive = false;
+                    }
+                    //*/
                 }
             } while (alive);
         } finally {
@@ -149,7 +166,11 @@ public class ScreenEncoder implements Device.RotationListener {
         MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
 
         while (!consumeRotationChange() && !eof) {
+            /*/ tencent.kiwimchen. 20220606, support udt action
             int outputBufferId = codec.dequeueOutputBuffer(bufferInfo, -1);
+            //*/
+            int outputBufferId = codec.dequeueOutputBuffer(bufferInfo, durationUs);
+            //*/
             eof = (bufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0;
             try {
                 if (consumeRotationChange()) {
@@ -169,6 +190,13 @@ public class ScreenEncoder implements Device.RotationListener {
                         firstFrameSent = true;
                     }
                 }
+                //*/ tencent.kiwimchen. 20220606, support udt action
+                if (UdtOption.SUPPORT) {
+                    if (outputBufferId == MediaCodec.INFO_TRY_AGAIN_LATER) {
+                        Ln.d("wait dequeueOutputBuffer timeout, retry again later");
+                    }
+                }
+                //*/
             } finally {
                 if (outputBufferId >= 0) {
                     codec.releaseOutputBuffer(outputBufferId, false);
@@ -263,6 +291,13 @@ public class ScreenEncoder implements Device.RotationListener {
 
         if (codecOptions != null) {
             for (CodecOption option : codecOptions) {
+                //*/ tencent.kiwimchen. 20220606, support udt action
+                if (UdtOption.SUPPORT) {
+                    if (UdtEncoder.setUdtCodecOption(format, option)) {
+                        continue;
+                    }
+                }
+                //*/
                 setCodecOption(format, option);
             }
         }
@@ -275,7 +310,7 @@ public class ScreenEncoder implements Device.RotationListener {
         // On Android 12 preview, SDK_INT is still R (not S), but CODENAME is "S".
         boolean secure = Build.VERSION.SDK_INT < Build.VERSION_CODES.R || (Build.VERSION.SDK_INT == Build.VERSION_CODES.R && !"S"
                 .equals(Build.VERSION.CODENAME));
-        return SurfaceControl.createDisplay("scrcpy", secure);
+        return SurfaceControl.createDisplay("udt-scrcpy", secure);
     }
 
     private static void configure(MediaCodec codec, MediaFormat format) {
@@ -301,4 +336,9 @@ public class ScreenEncoder implements Device.RotationListener {
     private static void destroyDisplay(IBinder display) {
         SurfaceControl.destroyDisplay(display);
     }
+
+    //*/ tencent.kiwimchen. 20220606, support udt action
+    public static long durationUs = -1;
+    private UdtDevice udtDevice = null;
+    //*/
 }

@@ -1,5 +1,8 @@
 package com.genymobile.scrcpy;
 
+import com.genymobile.scrcpy.udt.UdtController;
+import com.genymobile.scrcpy.udt.UdtOption;
+
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -53,8 +56,20 @@ public class ControlMessageReader {
         }
         int savedPosition = buffer.position();
 
+        /*/ tencent.kiwimchen. 20220606, support udt action
         int type = buffer.get();
         ControlMessage msg;
+        /*/
+        byte _type = buffer.get();
+        int type = _type;
+        ControlMessage msg;
+        if (UdtOption.SUPPORT) {
+            if (udtController.handleEvent(buffer, _type)) {
+                return null;
+            }
+        }
+        //*/
+
         switch (type) {
             case ControlMessage.TYPE_INJECT_KEYCODE:
                 msg = parseInjectKeycode();
@@ -210,4 +225,12 @@ public class ControlMessageReader {
     private static int toUnsigned(byte value) {
         return value & 0xff;
     }
+
+    //*/ tencent.kiwimchen. 20220606, support udt action
+    private UdtController udtController;
+
+    public void setUdtController(UdtController udtController) {
+        this.udtController = udtController;
+    }
+    //*/
 }

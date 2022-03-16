@@ -125,4 +125,18 @@ public final class DesktopConnection implements Closeable {
     public void sendDeviceMessage(DeviceMessage msg) throws IOException {
         writer.writeTo(msg, controlOutputStream);
     }
+
+    //*/ tencent.kiwimchen. 20220606, support udt action
+    public static DesktopConnection build(LocalSocket videoSocket, LocalSocket controlSocket) throws IOException {
+        return new DesktopConnection(videoSocket, controlSocket);
+    }
+
+    public OutputStream getOutputStream() {
+        return controlOutputStream;
+    }
+
+    public ControlMessageReader getReader() {
+        return reader;
+    }
+    //*/
 }
