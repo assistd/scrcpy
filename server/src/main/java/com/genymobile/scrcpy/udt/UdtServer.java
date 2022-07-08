@@ -32,7 +32,6 @@ public class UdtServer {
         boolean control = options.getControl();
         boolean sendDummyByte = options.getSendDummyByte();
 
-        final IOException[] runException = new IOException[1];
         final int MAX_THREAD_COUNT = 2 * 10; // just support 10 concurrent client
         java.util.concurrent.ExecutorService executors =
                 java.util.concurrent.Executors.newFixedThreadPool(MAX_THREAD_COUNT);
@@ -53,9 +52,14 @@ public class UdtServer {
                                         final Device device = new Device(options);
                                         streamScreen(connection, device, options, codecOptions, control);
                                     } catch (IOException e) {
-                                        runException[0] = e;
                                         UdtLn.i("client: " + connection +
                                                 ", exit by IOException: " +  e);
+                                        try {
+                                            executors.awaitTermination(0L, java.util.concurrent.TimeUnit.NANOSECONDS);
+                                        } catch (InterruptedException e1) {}
+
+                                        // exit
+                                        System.exit(-1);
                                     } finally {
                                         try {
                                             connection.close();
@@ -71,16 +75,6 @@ public class UdtServer {
         } catch (Exception e) {
             throw e;
         }
-
-        while (runException[0].toString().length() == 0) {
-            UdtLn.i("loop for wait stream connection: ");
-            android.os.SystemClock.sleep(5000);
-        }
-
-        try {
-            executors.awaitTermination(0L, java.util.concurrent.TimeUnit.NANOSECONDS);
-        } catch (InterruptedException e) {}
-
         return true;
     }
 

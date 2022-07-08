@@ -31,7 +31,7 @@ public final class ScreenCapture implements Device.RotationListener {
         void onImageAvailable(byte[] bitmap, int size);
     }
 
-    private static final String TAG = "capture";
+    private static final String TAG = "capture,";
     private static final boolean ENCODE_FROM_JPEG_TURBO = true;
 
     private int height, quality;
@@ -89,8 +89,8 @@ public final class ScreenCapture implements Device.RotationListener {
             this.height = height;
             this.quality = quality;
             this.options = options;
-            startLoopThread();
             running.set(true);
+            startLoopThread();
             notify();
         } if (this.height != height || this.quality != quality) {
             UdtLn.i(TAG + " update capture config,"
@@ -101,11 +101,13 @@ public final class ScreenCapture implements Device.RotationListener {
             this.quality = quality;
             this.options = options;
             rotationChanged.set(true);
+        } else {
+            UdtLn.d(TAG + " no need update capture config, height = " + height + " quality =" +quality);
         }
     }
 
     public synchronized void addListener(OnImageAvailableListener listener) {
-        UdtLn.i(TAG + " add capture listener = " + listener);
+        UdtLn.i(TAG + " add capture listener = " + listener + ", imageReaderReady = " + imageReaderReady);
         listeners.add(listener);
         if (imageReaderReady) {
             notify();
@@ -129,7 +131,10 @@ public final class ScreenCapture implements Device.RotationListener {
         do {
             synchronized (this) {
                 while (!running.get()) {
-                    try { wait(); } catch (Exception e) {}
+                    try {
+                         wait(2000);
+                         UdtLn.d(TAG + " wait thread start cmd");
+                     } catch (Exception e) {}
                 }
             }
             options.setMaxSize(height);
@@ -155,11 +160,13 @@ public final class ScreenCapture implements Device.RotationListener {
                 @Override
                 public void onImageAvailable(ImageReader reader) {
                     synchronized (ScreenCapture.this) {
+                        UdtLn.i(TAG + " image reader is ready");
                         imageReaderReady = true;
                         ScreenCapture.this.notify();
                     }
                 }
             }, backgroundHandler);
+            UdtLn.i(TAG + " start loop to capture");
 
             try {
                 handleImage(imageReader);
@@ -168,6 +175,7 @@ public final class ScreenCapture implements Device.RotationListener {
                 imageReaderReady = false;
                 data = null;
                 imageReader.close();
+                UdtLn.i(TAG + " destroy capture display");
                 destroyDisplay();
             }
         } while (running.get());
@@ -175,16 +183,18 @@ public final class ScreenCapture implements Device.RotationListener {
     }
 
     private void handleImage(ImageReader reader) {
+        UdtLn.i(TAG + " handle image start");
         do {
             synchronized (this) {
                 if (listeners.size() == 0 || !imageReaderReady) {
                     try {
-                        wait(100);
+                        wait(10000);
+                        UdtLn.i(TAG + " no listerner or image reader not ready, recheck");
                         continue;
                     } catch (Exception ignored) { }
                  }
              }
-            UdtLn.i(TAG + " start to acquireLatestImage for listener: " + listeners.size());
+            UdtLn.i(TAG + " acquire Latest Image for listener: " + listeners.size());
             Image image = reader.acquireLatestImage();
             if (image != null) {
                 if (ENCODE_FROM_JPEG_TURBO) {
@@ -208,7 +218,7 @@ public final class ScreenCapture implements Device.RotationListener {
                 }
             }
         } while (!consumeRotationChange() && running.get()); // check 2s
-        UdtLn.i(TAG + " handle image end");
+        UdtLn.i(TAG + " exit of cap thread");
     }
 
     protected static IBinder createDisplay() {
@@ -248,7 +258,7 @@ public final class ScreenCapture implements Device.RotationListener {
             encoder.allocate(image.getWidth(), image.getHeight());
             return encoder.encode(image, quality);
         } catch (Exception e) {
-            UdtLn.e(" get jpeg by jpeg turbo  error: " + e);
+            UdtLn.e(" encode jpeg by turbo error: " + e);
         }
         return null;
     }

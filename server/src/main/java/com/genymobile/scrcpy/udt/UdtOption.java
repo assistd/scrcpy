@@ -8,7 +8,6 @@ public class UdtOption {
     public static Boolean SUPPORT = true;
     public static String SOCKET_NAME = "scrcpy";
 
-
     public static boolean createOptions( String key, String value) {
         switch (key) {
             case "udt_enable":

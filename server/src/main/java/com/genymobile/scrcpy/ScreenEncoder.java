@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ScreenEncoder implements Device.RotationListener {
 
-    private static final int DEFAULT_I_FRAME_INTERVAL = 10; // seconds
+    private static final int DEFAULT_I_FRAME_INTERVAL = 1; // seconds
     private static final int REPEAT_FRAME_DELAY_US = 100_000; // repeat after 100ms
     private static final String KEY_MAX_FPS_TO_ENCODER = "max-fps-to-encoder";
 
@@ -212,15 +212,12 @@ public class ScreenEncoder implements Device.RotationListener {
 
         long pts;
         if ((bufferInfo.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
-            pts = PACKET_FLAG_CONFIG; // non-media data packet
+            pts = -1; // non-media data packet
         } else {
             if (ptsOrigin == 0) {
                 ptsOrigin = bufferInfo.presentationTimeUs;
             }
             pts = bufferInfo.presentationTimeUs - ptsOrigin;
-            if ((bufferInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0) {
-                pts |= PACKET_FLAG_KEY_FRAME;
-            }
         }
 
         headerBuffer.putLong(pts);
@@ -280,6 +277,7 @@ public class ScreenEncoder implements Device.RotationListener {
         format.setInteger(MediaFormat.KEY_FRAME_RATE, 60);
         format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
         format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, DEFAULT_I_FRAME_INTERVAL);
+
         // display the very first frame, and recover from bad quality when no new frames
         format.setLong(MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER, REPEAT_FRAME_DELAY_US); // µs
         if (maxFps > 0) {
