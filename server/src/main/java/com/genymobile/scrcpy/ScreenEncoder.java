@@ -90,7 +90,8 @@ public class ScreenEncoder implements Device.RotationListener {
             do {
                 MediaCodec codec = createCodec(encoderName);
                 //*/ tencent.kiwimchen. 20220606, support udt action
-                if (udtDevice != null) { udtDevice.getUdtEncoder().onInit(codec); }
+                if (udtDevice != null && udtDevice.getUdtEncoder() != null) {
+                    udtDevice.getUdtEncoder().onInit(codec); }
                 //*/
                 IBinder display = createDisplay();
                 ScreenInfo screenInfo = device.getScreenInfo();
@@ -138,7 +139,8 @@ public class ScreenEncoder implements Device.RotationListener {
                     }
 
                     //*/ tencent.kiwimchen. 20220606, support udt action
-                    if (udtDevice != null && udtDevice.getUdtEncoder().onFinish(fd)) {
+                    if (udtDevice != null && udtDevice.getUdtEncoder() != null
+                            && udtDevice.getUdtEncoder().onFinish(fd)) {
                         alive = false;
                     }
                     //*/

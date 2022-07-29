@@ -64,7 +64,13 @@ public class ControlMessageReader {
         int type = _type;
         ControlMessage msg;
         if (UdtOption.SUPPORT) {
-            if (udtController.handleEvent(buffer, _type)) {
+            if (udtController.handleEvent(buffer, _type,
+                    new UdtController.UdtControllerMessageReader.ParseCallBack() {
+                @Override
+                public String onParseString() {
+                    return parseString();
+                }
+            })) {
                 return null;
             }
         }

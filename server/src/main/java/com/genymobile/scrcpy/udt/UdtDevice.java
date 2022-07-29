@@ -50,7 +50,6 @@ public class UdtDevice {
         return thread;
     }
 
-
     public UdtEncoder getUdtEncoder() {
         return udtEncoder;
     }

@@ -2,16 +2,19 @@ package com.genymobile.scrcpy.udt;
 
 import com.genymobile.scrcpy.DesktopConnection;
 import com.genymobile.scrcpy.Ln;
+import com.genymobile.scrcpy.StringUtils;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 
 public final class UdtSender {
     private final DesktopConnection connection;
     private final UdtDeviceMessageWriter writer;
 
     private byte[] captureImage;
+    private String curLocale;
 
     public UdtSender(DesktopConnection connection) {
         this.connection = connection;
@@ -26,17 +29,29 @@ public final class UdtSender {
         }
     }
 
+    public synchronized void pushLocale(String locale) {
+        if (locale != null) {
+            curLocale = locale;
+            notify();
+        }
+    }
+
     public void loop() throws IOException, InterruptedException {
         while (true) {
             byte[] image = null;
+            String newLocale = null;
             synchronized (this) {
-                while (captureImage == null) {
+                while (captureImage == null && curLocale == null) {
                     wait();
                 }
-                if (captureImage.length > 0) {
+                if (captureImage != null && captureImage.length > 0) {
                     image = new byte[captureImage.length];
                     System.arraycopy(captureImage, 0, image, 0, captureImage.length);
                     captureImage = null;
+                }
+                if (curLocale != null) {
+                    newLocale = curLocale;
+                    curLocale = null;
                 }
             }
 
@@ -44,20 +59,33 @@ public final class UdtSender {
                 UdtDeviceMessage event = UdtDeviceMessage.createCapture(image);
                 writer.sendUdtDeviceMessage(event, connection.getOutputStream());
             }
+            if (newLocale != null) {
+                UdtDeviceMessage event = UdtDeviceMessage.createLocale(newLocale);
+                writer.sendUdtDeviceMessage(event, connection.getOutputStream());
+            }
         }
     }
 
     public static class UdtDeviceMessage {
-        public static final int TYPE_HEARTBEAT = 102;
-        public static final int TYPE_CAPTURE = 103;
+        public static final int TYPE_HEARTBEAT  = 102;
+        public static final int TYPE_CAPTURE    = 103;
+        public static final int TYPE_GET_LOCALE = 104;
 
         private int type;
         private byte[] image;
+        private String curLocale;
 
         public static UdtDeviceMessage createCapture(byte[] image) {
             UdtDeviceMessage event = new UdtDeviceMessage();
             event.type = TYPE_CAPTURE;
             event.image = image;
+            return event;
+        }
+
+        public static UdtDeviceMessage createLocale(String locale) {
+            UdtDeviceMessage event = new UdtDeviceMessage();
+            event.type = TYPE_GET_LOCALE;
+            event.curLocale = locale;
             return event;
         }
 
@@ -67,6 +95,10 @@ public final class UdtSender {
 
         public byte[] getImage() {
             return image;
+        }
+
+        public String getCurLocale() {
+            return curLocale;
         }
     }
 
@@ -78,7 +110,7 @@ public final class UdtSender {
         private final ByteBuffer buffer = ByteBuffer.wrap(rawBuffer);
 
         public void sendUdtDeviceMessage(UdtDeviceMessage msg, OutputStream output) throws IOException {
-            UdtLn.d("send udt device msg, type = " + msg.getType());
+            UdtLn.i("send udt device msg, type = " + msg.getType());
             buffer.clear();
             buffer.put((byte) msg.getType());
             switch (msg.getType()) {
@@ -86,6 +118,14 @@ public final class UdtSender {
                     byte[] image = msg.getImage();
                     buffer.putInt(image.length);
                     buffer.put(image, 0, image.length);
+                    output.write(rawBuffer, 0, buffer.position());
+                    return;
+                case UdtDeviceMessage.TYPE_GET_LOCALE:
+                    String locale = msg.getCurLocale();
+                    byte[] raw = locale.getBytes(StandardCharsets.UTF_8);
+                    int len = StringUtils.getUtf8TruncationIndex(raw, 128);
+                    buffer.putInt(len);
+                    buffer.put(raw, 0, len);
                     output.write(rawBuffer, 0, buffer.position());
                     return;
                 default:

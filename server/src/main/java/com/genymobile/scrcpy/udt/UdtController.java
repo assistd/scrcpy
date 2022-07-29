@@ -1,10 +1,14 @@
 package com.genymobile.scrcpy.udt;
 
+import android.os.Build;
+import android.os.LocaleList;
+
 import com.genymobile.scrcpy.DesktopConnection;
 import com.genymobile.scrcpy.Options;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Locale;
 
 public class UdtController implements ScreenCapture.OnImageAvailableListener {
     private UdtDevice device;
@@ -36,10 +40,10 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
         return udtSender;
     }
 
-    public boolean handleEvent(ByteBuffer buffer, byte _type) {
+    public boolean handleEvent(ByteBuffer buffer, byte _type, UdtControllerMessageReader.ParseCallBack parseCallBack) {
         int type = _type;
         UdtLn.i("receiving msg, type:" + String.format("0x%02x", _type) + " pos:" + buffer.position());
-        UdtControlMessage udtMsg = UdtControllerMessageReader.parseUdtEvent(buffer, type);
+        UdtControlMessage udtMsg = UdtControllerMessageReader.parseUdtEvent(buffer, type, parseCallBack);
         if (udtMsg == null) {
             return false;
         }
@@ -81,6 +85,30 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
             case UdtControlMessage.TYPE_PAUSE_VIDEO:
             case UdtControlMessage.TYPE_RESUME_VIDEO:
                 device.reqPauseVideo(udtMsg.getType() == UdtControlMessage.TYPE_PAUSE_VIDEO);
+                return true;
+            case UdtControlMessage.TYPE_SET_LOCALE:
+                String newLocal = udtMsg.getNewLocale();
+                String[] localInfos = newLocal.split("_");
+                if (localInfos.length == 2) {
+                    String language = localInfos[0];
+                    String country = localInfos[1];
+                    java.util.Locale newLocale = new java.util.Locale(language, country);
+                    UdtLn.i("set new locale" + newLocale);
+                    LocaleUtils.changeLanguage(newLocale);
+                } else {
+                    UdtLn.i("set new locale failed, illegal param: " + newLocal);
+                }
+                return true;
+            case UdtControlMessage.TYPE_GET_LOCALE:
+                Locale locale;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N){
+                    locale =  LocaleList.getDefault().get(0);
+                } else{
+                    locale = Locale.getDefault();
+                }
+                String currentLocale = locale.getLanguage() + "_" + locale.getCountry();
+                UdtLn.i("get current locale" + currentLocale);
+                udtSender.pushLocale(currentLocale);
                 return true;
             default:
                 return false;
@@ -140,11 +168,14 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
         public static final int TYPE_CAPTURE_DEVICE = 103;
         public static final int TYPE_PAUSE_VIDEO    = 104;
         public static final int TYPE_RESUME_VIDEO   = 105;
+        public static final int TYPE_GET_LOCALE     = 106;
+        public static final int TYPE_SET_LOCALE     = 107;
 
         private int type;
         private int bitRate;
         private int capHeight;
         private int capQuality = 80;
+        private String locale;
 
         public UdtControlMessage() {
         }
@@ -155,6 +186,10 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
 
         public int getBitRate() {
             return bitRate;
+        }
+
+        public String getNewLocale() {
+            return locale;
         }
 
         public static UdtControlMessage createEmpty(int type) {
@@ -185,13 +220,24 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
             msg.capQuality = quality;
             return msg;
         }
+
+        public static UdtControlMessage createSetLocale(String newLocale) {
+            UdtControlMessage msg = new UdtControlMessage();
+            msg.type = TYPE_SET_LOCALE;
+            msg.locale = newLocale;
+            return msg;
+        }
     }
 
     public static class UdtControllerMessageReader {
+        public interface ParseCallBack {
+            String onParseString();
+        }
+
         static final int SET_BITRATE_LENGTH = 4;
         static final int CAPTURE_DEVICE_SCREEN_LENGTH = 5; // type: 1 byte; height: 2 bytes; quality: 2 bytes
 
-        public static UdtControlMessage parseUdtEvent(ByteBuffer buffer, int type) {
+        public static UdtControlMessage parseUdtEvent(ByteBuffer buffer, int type, ParseCallBack parseCallBack) {
             switch(type) {
                 case UdtControlMessage.TYPE_SET_BITRATE:
                     return parseSetBitrate(buffer);
@@ -201,7 +247,10 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
                 case UdtControlMessage.TYPE_HEARTBEAT:
                 case UdtControlMessage.TYPE_PAUSE_VIDEO:
                 case UdtControlMessage.TYPE_RESUME_VIDEO:
+                case UdtControlMessage.TYPE_GET_LOCALE:
                     return UdtControlMessage.createEmpty(type);
+                case UdtControlMessage.TYPE_SET_LOCALE:
+                    return parseSetLocale(parseCallBack);
                 default:
                     return null;
             }
@@ -222,6 +271,15 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
             int height = buffer.getInt();
             int quality = buffer.getInt();
             return UdtControlMessage.createCaptureDevice(height, quality);
+        }
+
+        private static UdtControlMessage parseSetLocale(ParseCallBack parseCallBack) {
+            String newLocal = parseCallBack.onParseString();
+            if (newLocal == null) {
+                return null;
+            }
+            UdtLn.i("parseSetLocale: newLocal " + newLocal);
+            return UdtControlMessage.createSetLocale(newLocal);
         }
     }
 }

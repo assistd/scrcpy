@@ -8,7 +8,6 @@ import com.genymobile.scrcpy.Controller;
 import com.genymobile.scrcpy.DesktopConnection;
 import com.genymobile.scrcpy.Device;
 import com.genymobile.scrcpy.DeviceMessageSender;
-import com.genymobile.scrcpy.Ln;
 import com.genymobile.scrcpy.Options;
 import com.genymobile.scrcpy.ScreenEncoder;
 import com.genymobile.scrcpy.Size;
@@ -53,20 +52,24 @@ public class UdtServer {
                                         streamScreen(connection, device, options, codecOptions, control);
                                     } catch (IOException e) {
                                         UdtLn.i("client: " + connection +
-                                                ", exit by IOException: " +  e);
+                                                ", exit by IOException: " + e);
                                         try {
                                             executors.awaitTermination(0L, java.util.concurrent.TimeUnit.NANOSECONDS);
-                                        } catch (InterruptedException e1) {}
+                                        } catch (InterruptedException e1) {
+                                        }
 
                                         // exit
                                         System.exit(-1);
+                                    } catch (Exception e) {
+                                        UdtLn.i("client: " + connection +
+                                                ", exit by Exception: " + e);
                                     } finally {
                                         try {
                                             connection.close();
                                         } catch (Exception e1) {
                                         }
                                         sClientCount--;
-                                        Ln.i("stream stop and last client count: " + sClientCount);
+                                        UdtLn.i("stream stop and last client count: " + sClientCount);
                                     }
                                 }
                             });
@@ -114,7 +117,7 @@ public class UdtServer {
             screenEncoder.streamScreen(device, connection.getVideoFd());
         } catch (IOException e) {
             // this is expected on close
-            UdtLn.d("Screen streaming stopped");
+            UdtLn.w("Screen streaming stopped for " + connection.getVideoFd());
         } finally {
             // initThread.interrupt();
             if (controllerThread != null) {
@@ -210,7 +213,7 @@ public class UdtServer {
                     .getMethod("setArgV0", new Class[]{String.class})
                     .invoke(android.os.Process.class, objArr);
         } catch (Exception e) {
-            Ln.i("setProcessArgs error:" + e.toString());
+            UdtLn.i("setProcessArgs error:" + e.toString());
         }
     }
 }
