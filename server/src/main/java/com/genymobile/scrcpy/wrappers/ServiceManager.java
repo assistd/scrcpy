@@ -112,4 +112,15 @@ public final class ServiceManager {
 
         return activityManager;
     }
+
+    //*/ tencent.kiwimchen. 20220606, support udt action
+    private PackageManager packageManager;
+    public PackageManager getPackageManager() {
+        if (packageManager == null) {
+            packageManager = new PackageManager(getService("package",
+                    "android.content.pm.IPackageManager"));
+        }
+        return packageManager;
+    }
+    //*/
 }

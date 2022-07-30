@@ -1,6 +1,7 @@
 package com.genymobile.scrcpy;
 
 import com.genymobile.scrcpy.udt.UdtController;
+import com.genymobile.scrcpy.udt.UdtControllerMessageReader;
 import com.genymobile.scrcpy.udt.UdtOption;
 
 import java.io.EOFException;
@@ -65,7 +66,7 @@ public class ControlMessageReader {
         ControlMessage msg;
         if (UdtOption.SUPPORT) {
             if (udtController.handleEvent(buffer, _type,
-                    new UdtController.UdtControllerMessageReader.ParseCallBack() {
+                    new UdtControllerMessageReader.ParseCallBack() {
                 @Override
                 public String onParseString() {
                     return parseString();

@@ -22,7 +22,7 @@ CLASSES_DIR="$BUILD_DIR/classes"
 SERVER_DIR=$(dirname "$0")
 SERVER_BINARY=scrcpy-server
 ANDROID_JAR="$ANDROID_HOME/platforms/android-$PLATFORM/android.jar"
-JPEG_JAR="$(realpath .)/libs/turbojpeg.jar"
+JPEG_JAR="$BUILD_DIR/../server/libs/turbojpeg.jar"
 
 echo "Platform: android-$PLATFORM"
 echo "Build-tools: $BUILD_TOOLS"
