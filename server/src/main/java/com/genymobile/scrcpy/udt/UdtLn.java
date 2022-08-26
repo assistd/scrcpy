@@ -4,7 +4,7 @@ import android.util.Log;
 
 public final class UdtLn {
 
-    private static final String TAG = "udt-scrcpy";
+    private static String TAG = "udt-scrcpy";
     private static final String PREFIX = "[server] ";
 
     enum Level {
@@ -30,6 +30,10 @@ public final class UdtLn {
 
     public static boolean isEnabled(Level level) {
         return level.ordinal() >= threshold.ordinal();
+    }
+
+    public static void setTag(String tag) {
+        TAG = tag;
     }
 
     public static void v(String message) {

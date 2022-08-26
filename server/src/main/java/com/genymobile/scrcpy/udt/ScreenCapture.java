@@ -123,11 +123,7 @@ public final class ScreenCapture implements Device.RotationListener {
     @TargetApi(Build.VERSION_CODES.KITKAT)
     public void prepare() {
         Workarounds.prepareMainLooper();
-        options.setMaxSize(height);
-        final Device device = new Device(options);
-        device.setRotationListener(this);
         UdtLn.i(TAG + " init capture device");
-
         do {
             synchronized (this) {
                 while (!running.get()) {
@@ -138,6 +134,8 @@ public final class ScreenCapture implements Device.RotationListener {
                 }
             }
             options.setMaxSize(height);
+            Device device = new Device(options);
+            device.setRotationListener(this);
 
             display = createDisplay();
             ScreenInfo screenInfo = device.getScreenInfo();

@@ -46,6 +46,7 @@ public class ScreenEncoder implements Device.RotationListener {
     private long ptsOrigin;
 
     private boolean firstFrameSent;
+    private static int count = 0;
 
     public ScreenEncoder(boolean sendFrameMeta, int bitRate, int maxFps, List<CodecOption> codecOptions, String encoderName,
             boolean downsizeOnError) {
@@ -310,7 +311,7 @@ public class ScreenEncoder implements Device.RotationListener {
         // On Android 12 preview, SDK_INT is still R (not S), but CODENAME is "S".
         boolean secure = Build.VERSION.SDK_INT < Build.VERSION_CODES.R || (Build.VERSION.SDK_INT == Build.VERSION_CODES.R && !"S"
                 .equals(Build.VERSION.CODENAME));
-        return SurfaceControl.createDisplay("udt-scrcpy", secure);
+        return SurfaceControl.createDisplay(sSurfaceName + (count++), secure);
     }
 
     private static void configure(MediaCodec codec, MediaFormat format) {
@@ -339,6 +340,7 @@ public class ScreenEncoder implements Device.RotationListener {
 
     //*/ tencent.kiwimchen. 20220606, support udt action
     public static long durationUs = -1;
+    public static String sSurfaceName = "udt-scrcpy";
     private UdtDevice udtDevice = null;
     //*/
 }

@@ -17,23 +17,15 @@ import java.util.List;
 
 public class UdtServer {
     private static int sClientCount = 0;
-    private static final String PROCESS_NAME = "udt-scrcpy";
 
     // sync with {com.genymobile.scrcpy.Server.scrcpy()}
     public static boolean scrcpy(Options options) throws IOException {
-        setProcessArgs(PROCESS_NAME);
+        setProcessArgs(UdtOption.SOCKET_NAME);
+        ScreenEncoder.sSurfaceName = UdtOption.SOCKET_NAME;
+        UdtLn.setTag(UdtOption.SOCKET_NAME);
 
-        List<CodecOption> codecOptions = options.getCodecOptions();
-
-        // Thread initThread = startInitThread(options);
-
-        boolean tunnelForward = options.isTunnelForward();
         boolean control = options.getControl();
         boolean sendDummyByte = options.getSendDummyByte();
-
-        final int MAX_THREAD_COUNT = 2 * 10; // just support 10 concurrent client
-        java.util.concurrent.ExecutorService executors =
-                java.util.concurrent.Executors.newFixedThreadPool(MAX_THREAD_COUNT);
 
         UdtLn.i("Start wait multi connection");
         try {
@@ -42,43 +34,60 @@ public class UdtServer {
                         @Override
                         public void onConnect(DesktopConnection connection) {
                             sClientCount++;
-                            UdtLn.i("client: " + connection +
-                                    ", stream start and last client count: " + sClientCount);
-                            executors.submit(new Runnable() {
-                                @Override
-                                public void run() {
-                                    try {
-                                        final Device device = new Device(options);
-                                        streamScreen(connection, device, options, codecOptions, control);
-                                    } catch (IOException e) {
-                                        UdtLn.i("client: " + connection +
-                                                ", exit by IOException: " + e);
-                                        try {
-                                            executors.awaitTermination(0L, java.util.concurrent.TimeUnit.NANOSECONDS);
-                                        } catch (InterruptedException e1) {
-                                        }
-
-                                        // exit
-                                        System.exit(-1);
-                                    } catch (Exception e) {
-                                        UdtLn.i("client: " + connection +
-                                                ", exit by Exception: " + e);
-                                    } finally {
-                                        try {
-                                            connection.close();
-                                        } catch (Exception e1) {
-                                        }
-                                        sClientCount--;
-                                        UdtLn.i("stream stop and last client count: " + sClientCount);
-                                    }
-                                }
-                            });
+                            UdtLn.i("on connect and current count = " + sClientCount);
+                            StreamClient client = new StreamClient(connection, options);
+                            client.start();
                         }
                     });
         } catch (Exception e) {
             throw e;
         }
         return true;
+    }
+
+    private static class StreamClient extends Thread {
+        DesktopConnection connection;
+        Options options;
+
+        StreamClient(DesktopConnection connection, Options options) {
+            this.connection = connection;
+            this.options = options;
+        }
+
+        @Override
+        public void interrupt() {
+            try {
+                connection.close();
+            }
+            catch (IOException e) {
+                UdtLn.i("StreamClient interrupt by err: " + e);
+            }
+        }
+
+        @Override
+        public void run() {
+            UdtLn.i("StreamClient start for connect: " + connection);
+            List<CodecOption> codecOptions = options.getCodecOptions();
+            boolean control = options.getControl();
+            try {
+                final Device device = new Device(options);
+                streamScreen(connection, device, options, codecOptions, control);
+            } catch (IOException e) {
+                UdtLn.i("client: " + connection +
+                        ", exit by IOException: " + e);
+                System.exit(1);
+            } catch (Exception e) {
+                UdtLn.i("client: " + connection +
+                        ", exit by Exception: " + e);
+            } finally {
+                try {
+                    connection.close();
+                } catch (Exception e1) {
+                }
+                sClientCount--;
+                UdtLn.i("stream stop and last client count: " + sClientCount);
+            }
+        }
     }
 
     // sync with {com.genymobile.scrcpy.Server.startController()}
