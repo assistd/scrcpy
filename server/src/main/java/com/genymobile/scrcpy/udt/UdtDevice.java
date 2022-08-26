@@ -54,6 +54,10 @@ public class UdtDevice {
         return udtEncoder;
     }
 
+    public int getRotation() {
+        return device.getScreenInfo().getDeviceRotation();
+    }
+
     public void reqIDRFrame() {
         if (udtEncoder != null) {
             udtEncoder.onReqIDRFrame();

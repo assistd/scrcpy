@@ -15,6 +15,7 @@ public final class UdtSender {
     private byte[] captureImage;
     private String curLocale;
     private String appLists;
+    private int rotation = -1;
 
     public UdtSender(DesktopConnection connection) {
         this.connection = connection;
@@ -43,13 +44,25 @@ public final class UdtSender {
         }
     }
 
+    public synchronized void pushRotation(int rotation) {
+        if (rotation >= 0) {
+            this.rotation = rotation;
+            notify();
+        }
+    }
+
     public void loop() throws IOException, InterruptedException {
         while (true) {
             byte[] image = null;
             String newLocale = null;
             String apps = null;
+            int rotation = -1;
             synchronized (this) {
-                while (captureImage == null && curLocale == null && appLists == null) {
+                while (captureImage == null
+                        && curLocale == null
+                        && appLists == null
+                        && this.rotation < 0
+                ) {
                     wait();
                 }
                 if (captureImage != null && captureImage.length > 0) {
@@ -65,8 +78,11 @@ public final class UdtSender {
                     apps = appLists;
                     appLists = null;
                 }
+                if (this.rotation >= 0) {
+                    rotation = this.rotation;
+                    this.rotation = -1;
+                }
             }
-
             if (image != null) {
                 UdtDeviceMessage event = UdtDeviceMessage.createCapture(image);
                 writer.sendUdtDeviceMessage(event, connection.getOutputStream());
@@ -79,6 +95,10 @@ public final class UdtSender {
                 UdtDeviceMessage event = UdtDeviceMessage.createInstalledApps(apps);
                 writer.sendUdtDeviceMessage(event, connection.getOutputStream());
             }
+            if (rotation >= 0) {
+                UdtDeviceMessage event = UdtDeviceMessage.createGetRotation(rotation);
+                writer.sendUdtDeviceMessage(event, connection.getOutputStream());
+            }
         }
     }
 
@@ -87,11 +107,13 @@ public final class UdtSender {
         public static final int TYPE_CAPTURE    = 103;
         public static final int TYPE_GET_LOCALE = 104;
         public static final int TYPE_GET_APPS   = 105;
+        public static final int TYPE_GET_ROTATION   = 106;
 
         private int type;
         private byte[] image;
         private String curLocale;
         private String apps;
+        private int rotation = -1;
 
         public static UdtDeviceMessage createCapture(byte[] image) {
             UdtDeviceMessage event = new UdtDeviceMessage();
@@ -114,6 +136,13 @@ public final class UdtSender {
             return event;
         }
 
+        public static UdtDeviceMessage createGetRotation(int rotation) {
+            UdtDeviceMessage event = new UdtDeviceMessage();
+            event.type = TYPE_GET_ROTATION;
+            event.rotation = rotation;
+            return event;
+        }
+
         public int getType() {
             return type;
         }
@@ -128,6 +157,10 @@ public final class UdtSender {
 
         public String getApps() {
             return apps;
+        }
+
+        public int getRotation() {
+            return rotation;
         }
     }
 
@@ -165,6 +198,11 @@ public final class UdtSender {
                     int i = StringUtils.getUtf8TruncationIndex(bytes, TEXT_MAX_LENGTH);
                     buffer.putInt(i);
                     buffer.put(bytes, 0, i);
+                    output.write(rawBuffer, 0, buffer.position());
+                    return;
+                case UdtDeviceMessage.TYPE_GET_ROTATION:
+                    int rotation = msg.getRotation();
+                    buffer.putInt(rotation);
                     output.write(rawBuffer, 0, buffer.position());
                     return;
                 default:

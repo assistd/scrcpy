@@ -86,6 +86,9 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
             case UdtControlMessage.TYPE_GET_APPS:
                 getInstalledPackages();
                 return true;
+            case UdtControlMessage.TYPE_GET_ROTATION:
+                getRotation();
+                return true;
             default:
                 return false;
         }
@@ -199,5 +202,11 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
         }
         UdtLn.i("get apps: " + sb);
         udtSender.pushInstallApps(sb.toString());
+    }
+
+    private void getRotation() {
+        int rotation = device.getRotation();
+        UdtLn.i("get rotation: " + rotation);
+        udtSender.pushRotation(rotation);
     }
 }
