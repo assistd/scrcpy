@@ -22,6 +22,10 @@ public final class UdtSender {
         writer = new UdtDeviceMessageWriter();
     }
 
+    public void stop() {
+        writer.free();
+    }
+
     public synchronized void pushCaptureImage(byte[] image, int size) {
         if (image != null) {
             captureImage = new byte[size];
@@ -170,11 +174,18 @@ public final class UdtSender {
         public static final int LOCALE_MAX_LENGTH = 5 + 32; // type: 1 byte; length: 4 bytes;
         public static final int TEXT_MAX_LENGTH = MESSAGE_MAX_SIZE - 5; // type: 1 byte; length: 4 bytes
 
-        private final byte[] rawBuffer = new byte[MESSAGE_MAX_SIZE];
-        private final ByteBuffer buffer = ByteBuffer.wrap(rawBuffer);
+        private byte[] rawBuffer;
+        private ByteBuffer buffer;
 
         public void sendUdtDeviceMessage(UdtDeviceMessage msg, OutputStream output) throws IOException {
             UdtLn.i("send udt device msg, type = " + msg.getType());
+            if (buffer == null) {
+                if (rawBuffer == null) {
+                    rawBuffer = new byte[MESSAGE_MAX_SIZE];
+                }
+                buffer = ByteBuffer.wrap(rawBuffer);
+            }
+
             buffer.clear();
             buffer.put((byte) msg.getType());
             switch (msg.getType()) {
@@ -206,6 +217,15 @@ public final class UdtSender {
                     output.write(rawBuffer, 0, buffer.position());
                     return;
                 default:
+            }
+        }
+
+        public void free() {
+            if (buffer != null) {
+                buffer = null;
+            }
+            if (rawBuffer != null) {
+                rawBuffer = null;
             }
         }
     }

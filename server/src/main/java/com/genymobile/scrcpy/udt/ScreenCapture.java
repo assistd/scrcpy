@@ -14,7 +14,6 @@ import android.os.Looper;
 import android.view.Surface;
 
 import com.genymobile.scrcpy.Device;
-import com.genymobile.scrcpy.Ln;
 import com.genymobile.scrcpy.Options;
 import com.genymobile.scrcpy.ScreenInfo;
 import com.genymobile.scrcpy.Workarounds;

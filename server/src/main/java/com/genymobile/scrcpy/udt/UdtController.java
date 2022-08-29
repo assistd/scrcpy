@@ -42,6 +42,9 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
         UdtLn.i("stop controller ");
         running = false;
         ScreenCapture.getInstance().rmListener(this);
+        if (udtSender != null) {
+            udtSender.stop();
+        }
     }
 
     public UdtSender getUdtSender() {
