@@ -2,6 +2,7 @@ package com.genymobile.scrcpy;
 
 import com.genymobile.scrcpy.udt.UdtDevice;
 import com.genymobile.scrcpy.udt.UdtEncoder;
+import com.genymobile.scrcpy.udt.UdtLn;
 import com.genymobile.scrcpy.udt.UdtOption;
 import com.genymobile.scrcpy.wrappers.SurfaceControl;
 
@@ -196,7 +197,7 @@ public class ScreenEncoder implements Device.RotationListener {
                 //*/ tencent.kiwimchen. 20220606, support udt action
                 if (UdtOption.SUPPORT) {
                     if (outputBufferId == MediaCodec.INFO_TRY_AGAIN_LATER) {
-                        Ln.d("wait dequeueOutputBuffer timeout, retry again later");
+                        UdtLn.d("wait dequeueOutputBuffer timeout, retry again later");
                     }
                 }
                 //*/

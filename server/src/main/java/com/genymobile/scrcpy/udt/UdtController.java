@@ -25,12 +25,14 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
     private boolean running;
 
     private long lastTick = 0;
+    private long lastTickCheck = 0;
+    private long lastTickCount = 0;
     private Thread tickCheckThread;
 
     private final ServiceManager serviceManager = new ServiceManager();
 
     public UdtController(UdtDevice device, Options options, DesktopConnection connection) {
-        UdtLn.i("init controller ");
+        UdtLn.i("init udt controller");
         this.device = device;
         this.options = options;
         this.connection = connection;
@@ -39,7 +41,7 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
     }
 
     public void stop() {
-        UdtLn.i("stop controller ");
+        UdtLn.i("stop udt controller");
         running = false;
         ScreenCapture.getInstance().rmListener(this);
         if (udtSender != null) {
@@ -53,7 +55,7 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
 
     public boolean handleEvent(ByteBuffer buffer, byte _type, UdtControllerMessageReader.ParseCallBack parseCallBack) {
         int type = _type;
-        UdtLn.i("receiving msg, type:" + String.format("0x%02x", _type) + " pos:" + buffer.position());
+        UdtLn.d("receiving msg, type:" + String.format("0x%02x", _type) + " pos:" + buffer.position());
         UdtControlMessage udtMsg = UdtControllerMessageReader.parseUdtEvent(buffer, type, parseCallBack);
         if (udtMsg == null) {
             return false;
@@ -93,11 +95,17 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
                 getRotation();
                 return true;
             default:
+                UdtLn.e("unknown udt control msg, type = " + udtMsg.getType());
                 return false;
         }
     }
 
     public void onTick(DesktopConnection connection, long ts) {
+        lastTickCount++;
+        if (Math.abs(System.currentTimeMillis() - lastTickCheck) > 60 * 1000) {
+            UdtLn.d("dump heartbeat from client, total:" + lastTickCount);
+            lastTickCheck = System.currentTimeMillis();
+        }
         lastTick = ts;
         if (tickCheckThread == null) {
             tickCheckThread = startTickCheckThread(connection);
@@ -112,7 +120,8 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
                 while (running) {
                     //if 1min not heart from client, check connection is ok
                     if (Math.abs(System.currentTimeMillis() - lastTick) > 60 * 1000) {
-                        UdtLn.w("no heartbeat from client, close connection");
+                        UdtLn.w("no heartbeat from client, close connection," +
+                                " lastTickCount:" +  lastTickCount);
                         try {
                             connection.close();
                         } catch (IOException e) {
@@ -136,7 +145,7 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
     public void onImageAvailable(byte[] bitmap, int size) {
         synchronized (this) {
             if (snapshotOnce) {
-                UdtLn.d("image available, size = " + size);
+                UdtLn.i("screencap image available, send size: " + size);
                 udtSender.pushCaptureImage(bitmap, size);
                 snapshotOnce = false;
                 notify();
@@ -145,25 +154,33 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
     }
 
     private void captureScreen(int height, int quality) {
-        ScreenCapture.getInstance().addListener(this);
-        ScreenCapture.getInstance().setConfig(height, quality, options);
-        snapshotOnce = true;
-        int count = 0;
-        synchronized (this) {
-            // wait
-            while (snapshotOnce && running) {
-                if (count++ < 20) {
-                    try {
-                        wait(100);
-                    } catch (Exception e) {
+        UdtLn.i("screencap by height: " + height + ", quality" + quality);
+        try {
+            ScreenCapture.getInstance().addListener(this);
+            ScreenCapture.getInstance().setConfig(height, quality, options);
+            snapshotOnce = true;
+            int count = 0;
+            int maxCount = 50; //5s
+            synchronized (this) {
+                // wait
+                while (snapshotOnce && running) {
+                    if (count++ < maxCount) {
+                        try {
+                            wait(100);
+                        } catch (Exception e) {
+                        }
+                    } else {
+                        UdtLn.i("screencap failed by timeout ( >5s )");
+                        break;
                     }
-                } else {
-                    UdtLn.d("capture device timeout ( >2s )");
-                    break;
+                }
+                if (count < maxCount) {
+                    UdtLn.i("screencap success, send image onImageAvailable");
                 }
             }
+        } finally {
+            ScreenCapture.getInstance().rmListener(this);
         }
-        ScreenCapture.getInstance().rmListener(this);
     }
 
     private void setLocale(String newLocale) {
@@ -172,8 +189,8 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
             String language = localeInfos[0];
             String country = localeInfos[1];
             Locale l = new Locale(language, country);
-            UdtLn.i("set new locale" + l);
-            LocaleUtils.changeLanguage(l);
+            boolean ok = LocaleUtils.changeLanguage(l);
+            UdtLn.i("set new locale: " + l + ", res: " + ok);
         } else {
             UdtLn.i("set new locale failed, illegal param: " + newLocale);
         }
@@ -187,7 +204,7 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
             locale = Locale.getDefault();
         }
         String currentLocale = locale.getLanguage() + "_" + locale.getCountry();
-        UdtLn.i("get current locale" + currentLocale);
+        UdtLn.i("get device locale: " + currentLocale);
         udtSender.pushLocale(currentLocale);
     }
 
@@ -203,13 +220,13 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
                     .append(info.versionName)
                     .append(";");
         }
-        UdtLn.i("get apps: " + sb);
+        UdtLn.i("get device installed apps: " + sb);
         udtSender.pushInstallApps(sb.toString());
     }
 
     private void getRotation() {
         int rotation = device.getRotation();
-        UdtLn.i("get rotation: " + rotation);
+        UdtLn.i("get device rotation: " + rotation);
         udtSender.pushRotation(rotation);
     }
 }

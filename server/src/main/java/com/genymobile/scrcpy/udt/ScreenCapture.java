@@ -30,11 +30,12 @@ public final class ScreenCapture implements Device.RotationListener {
         void onImageAvailable(byte[] bitmap, int size);
     }
 
-    private static final String TAG = "capture,";
+    private static final String TAG = "screencap:";
     private static final boolean ENCODE_FROM_JPEG_TURBO = true;
 
     private int height, quality;
     private Options options;
+    private static int count = 0;
 
     private Handler backgroundHandler;
     private IBinder display;
@@ -84,7 +85,7 @@ public final class ScreenCapture implements Device.RotationListener {
 
     public synchronized void setConfig(int height, int quality, Options options) {
         if (this.height == 0) {
-            UdtLn.i(TAG + " init capture config, height = " + height + " quality =" +quality);
+            UdtLn.i(TAG + " init config, height = " + height + " quality =" +quality);
             this.height = height;
             this.quality = quality;
             this.options = options;
@@ -92,7 +93,7 @@ public final class ScreenCapture implements Device.RotationListener {
             startLoopThread();
             notify();
         } if (this.height != height || this.quality != quality) {
-            UdtLn.i(TAG + " update capture config,"
+            UdtLn.i(TAG + " update config,"
                     + " new height = " + height + " old height = " + this.height
                     + ", new quality =" +quality + " old quality =" + this.quality
             );
@@ -101,12 +102,12 @@ public final class ScreenCapture implements Device.RotationListener {
             this.options = options;
             rotationChanged.set(true);
         } else {
-            UdtLn.d(TAG + " no need update capture config, height = " + height + " quality =" +quality);
+            UdtLn.d(TAG + " no need update config, height = " + height + " quality =" +quality);
         }
     }
 
     public synchronized void addListener(OnImageAvailableListener listener) {
-        UdtLn.i(TAG + " add capture listener = " + listener + ", imageReaderReady = " + imageReaderReady);
+        UdtLn.d(TAG + " add listener = " + listener + ", imageReaderReady = " + imageReaderReady);
         listeners.add(listener);
         if (imageReaderReady) {
             notify();
@@ -114,7 +115,7 @@ public final class ScreenCapture implements Device.RotationListener {
     }
 
     public synchronized void rmListener(OnImageAvailableListener listener) {
-        UdtLn.i(TAG + " rm capture listener = " + listener);
+        UdtLn.d(TAG + " rm listener = " + listener);
         listeners.remove(listener);
         notify();
     }
@@ -122,13 +123,13 @@ public final class ScreenCapture implements Device.RotationListener {
     @TargetApi(Build.VERSION_CODES.KITKAT)
     public void prepare() {
         Workarounds.prepareMainLooper();
-        UdtLn.i(TAG + " init capture device");
+        UdtLn.i(TAG + " prepare to capture");
         do {
             synchronized (this) {
                 while (!running.get()) {
                     try {
-                         wait(2000);
-                         UdtLn.d(TAG + " wait thread start cmd");
+                         wait(60 * 1000);
+                         UdtLn.d(TAG + " wait for config ready");
                      } catch (Exception e) {}
                 }
             }
@@ -147,7 +148,7 @@ public final class ScreenCapture implements Device.RotationListener {
             int layerStack = device.getLayerStack();
             ImageReader imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2);
 
-            UdtLn.i(TAG + " init image reader by config:"
+            UdtLn.i(TAG + " init config:"
                     + " contentRect" + contentRect.toString()
                     + " videoW: " + width + " videoH: " + height
                     + " ori: " + videoRotation);
@@ -180,18 +181,21 @@ public final class ScreenCapture implements Device.RotationListener {
     }
 
     private void handleImage(ImageReader reader) {
-        UdtLn.i(TAG + " handle image start");
+        UdtLn.i(TAG + " start capture loop");
         do {
             synchronized (this) {
                 if (listeners.size() == 0 || !imageReaderReady) {
                     try {
-                        wait(10000);
-                        UdtLn.i(TAG + " no listerner or image reader not ready, recheck");
+                        wait(10 * 1000);
+                        UdtLn.d(TAG + "wait..., current listeners " + listeners.size()
+                                + ", imageReaderReady " + imageReaderReady);
                         continue;
-                    } catch (Exception ignored) { }
+                    } catch (Exception e) {
+                        UdtLn.d(TAG + "wait error " + e);
+                    }
                  }
              }
-            UdtLn.i(TAG + " acquire Latest Image for listener: " + listeners.size());
+            UdtLn.d(TAG + " acquire Latest Image for listener: " + listeners.size());
             Image image = reader.acquireLatestImage();
             if (image != null) {
                 if (ENCODE_FROM_JPEG_TURBO) {
@@ -202,6 +206,7 @@ public final class ScreenCapture implements Device.RotationListener {
                 image.close();
             } else {
                 // use last jpeg data.
+                UdtLn.e(TAG + "acquire Latest Image failed by image is null");
             }
 
             synchronized (this) {
@@ -215,13 +220,13 @@ public final class ScreenCapture implements Device.RotationListener {
                 }
             }
         } while (!consumeRotationChange() && running.get()); // check 2s
-        UdtLn.i(TAG + " exit of cap thread");
+        UdtLn.i(TAG + " exit of capture loop");
     }
 
     protected static IBinder createDisplay() {
         boolean secure = Build.VERSION.SDK_INT <= Build.VERSION_CODES.R
                 && !Build.VERSION.CODENAME.equals("S");
-        return SurfaceControl.createDisplay("udt-screencap", secure);
+        return SurfaceControl.createDisplay("udt-screencap-" + (count++), secure);
     }
 
     private static void setDisplaySurface(IBinder display, Surface surface, int orientation,
