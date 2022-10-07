@@ -104,7 +104,9 @@ sc_decoder_push(struct sc_decoder *decoder, const AVPacket *packet) {
 
     int ret = avcodec_send_packet(decoder->codec_ctx, packet);
     if (ret < 0 && ret != AVERROR(EAGAIN)) {
-        LOGE("Could not send video packet: %d", ret);
+        char buf2[512];
+        av_strerror(ret, buf2, 512);
+        LOGE("Could not send video packet: %x: %s", ret, buf2);
         return false;
     }
     ret = avcodec_receive_frame(decoder->codec_ctx, decoder->frame);
