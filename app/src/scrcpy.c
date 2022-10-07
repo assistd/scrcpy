@@ -36,6 +36,8 @@
 # include "v4l2_sink.h"
 #endif
 
+extern bool ios_sc_server_start(struct sc_server *server);
+
 struct scrcpy {
     struct sc_server server;
     struct sc_screen screen;
@@ -336,9 +338,15 @@ scrcpy(struct scrcpy_options *options) {
         return SCRCPY_EXIT_FAILURE;
     }
 
+#if 1
+    if (!ios_sc_server_start(&s->server)) {
+        goto end;
+    }
+#else
     if (!sc_server_start(&s->server)) {
         goto end;
     }
+#endif
 
     server_started = true;
 
@@ -370,7 +378,7 @@ scrcpy(struct scrcpy_options *options) {
     struct sc_server_info *info = &s->server.info;
 
     const char *serial = s->server.serial;
-    assert(serial);
+    // assert(serial);
 
     struct sc_file_pusher *fp = NULL;
 
