@@ -303,7 +303,11 @@ public class ScreenEncoder implements Device.RotationListener {
                 setCodecOption(format, option);
             }
         }
-
+        //*/ tencent.kiwimchen. 20220606, support udt action
+        if (UdtOption.SUPPORT) {
+            UdtEncoder.chooseCodecLevel(format);
+        }
+        //*/
         return format;
     }
 

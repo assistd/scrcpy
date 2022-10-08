@@ -2,6 +2,8 @@ package com.genymobile.scrcpy;
 
 import android.graphics.Rect;
 
+import com.genymobile.scrcpy.udt.UdtOption;
+
 public final class ScreenInfo {
     /**
      * Device (physical) size, possibly cropped
@@ -108,6 +110,20 @@ public final class ScreenInfo {
     }
 
     private static Size computeVideoSize(int w, int h, int maxSize) {
+        if (UdtOption.SUPPORT && false) {
+            boolean portrait = h > w;
+            int major = portrait ? h : w;
+            int minor = portrait ? w : h;
+            if (major > maxSize) {
+                float sw = minor * maxSize / major;
+                minor = (int) (sw / 16 * 16);
+                major = maxSize;
+            }
+            w = portrait ? minor : major;
+            h = portrait ? major : minor;
+            return new Size(w, h);
+        }
+
         // Compute the video size and the padding of the content inside this video.
         // Principle:
         // - scale down the great side of the screen to maxSize (if necessary);

@@ -1,6 +1,10 @@
 package com.genymobile.scrcpy.udt;
 
+import static android.media.MediaFormat.MIMETYPE_VIDEO_AVC;
+
 import android.media.MediaCodec;
+import android.media.MediaCodecInfo;
+import android.media.MediaCodecList;
 import android.media.MediaFormat;
 
 import com.genymobile.scrcpy.CodecOption;
@@ -100,5 +104,47 @@ public class UdtEncoder {
             }
         }
         return videoMode == Mode.Exit;
+    }
+
+    private static final String KEY_LEVEL = "level"; //@see MediaFormat.KEY_LEVEL
+    private static final String KEY_PROFILE = "profile"; //@see MediaFormat.KEY_PROFILE
+
+    private static final int CodecAVCProfileBaseline
+            = MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline;
+    private static final String mimeType = MIMETYPE_VIDEO_AVC;
+
+    public static MediaFormat chooseCodecLevel(MediaFormat format)  {
+        int sugguestLevel = -1;
+        int numCodecs = MediaCodecList.getCodecCount();
+        for (int i = 0; i < numCodecs; i++) {
+            MediaCodecInfo codecInfo = MediaCodecList.getCodecInfoAt(i);
+            if (!codecInfo.isEncoder()) {
+                continue;
+            }
+            String[] types = codecInfo.getSupportedTypes();
+            for (int j = 0; j < types.length; j++) {
+                if (!types[j].equalsIgnoreCase(mimeType)) {
+                    continue;
+                }
+                for (MediaCodecInfo.CodecProfileLevel level :
+                        codecInfo.getCapabilitiesForType(mimeType).profileLevels) {
+                    if (level.profile != CodecAVCProfileBaseline) {
+                       continue;
+                    }
+                    UdtLn.i("support codecs info:, level: " + level.level
+                            + ", profile: " + level.profile);
+                    if (level.level > sugguestLevel || sugguestLevel < 0) {
+                        sugguestLevel = level.level;
+                    }
+                }
+                break;
+            }
+        }
+
+        if (sugguestLevel >= 0) {
+            format.setInteger(KEY_PROFILE, CodecAVCProfileBaseline);
+            format.setInteger(KEY_LEVEL, sugguestLevel );
+        }
+        return format;
     }
 }
