@@ -16,6 +16,7 @@ import android.view.Surface;
 import com.genymobile.scrcpy.Device;
 import com.genymobile.scrcpy.Options;
 import com.genymobile.scrcpy.ScreenInfo;
+import com.genymobile.scrcpy.Size;
 import com.genymobile.scrcpy.Workarounds;
 import com.genymobile.scrcpy.wrappers.SurfaceControl;
 
@@ -36,6 +37,7 @@ public final class ScreenCapture implements Device.RotationListener {
     private int height, quality;
     private Options options;
     private static int count = 0;
+    private Size capSize;
 
     private Handler backgroundHandler;
     private IBinder display;
@@ -139,11 +141,16 @@ public final class ScreenCapture implements Device.RotationListener {
 
             display = createDisplay();
             ScreenInfo screenInfo = device.getScreenInfo();
-            final int width = screenInfo.getVideoSize().getWidth();
-            final int height = screenInfo.getVideoSize().getHeight();
+            capSize = computeCaptureSize(screenInfo.getVideoSize(),
+                    screenInfo.getContentRect().width(),
+                    screenInfo.getContentRect().height(), height,
+                    screenInfo.getVideoRotation());
+            UdtLn.i("compute capture size: " + capSize);
+            final int width = capSize.getWidth();
+            final int height = capSize.getHeight();
             Rect contentRect = screenInfo.getContentRect();
             // does not include the locked video orientation
-            Rect unlockedVideoRect = screenInfo.getUnlockedVideoSize().toRect();
+            Rect unlockedVideoRect = capSize.toRect();
             int videoRotation = screenInfo.getVideoRotation();
             int layerStack = device.getLayerStack();
             ImageReader imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2);
@@ -186,7 +193,7 @@ public final class ScreenCapture implements Device.RotationListener {
             synchronized (this) {
                 if (listeners.size() == 0 || !imageReaderReady) {
                     try {
-                        wait(10 * 1000);
+                        wait(100);
                         UdtLn.d(TAG + "wait..., current listeners " + listeners.size()
                                 + ", imageReaderReady " + imageReaderReady);
                         continue;
@@ -257,7 +264,8 @@ public final class ScreenCapture implements Device.RotationListener {
             if (encoder == null) {
                 encoder = new JpgEncoder();
             }
-            encoder.allocate(image.getWidth(), image.getHeight());
+
+            encoder.allocate(capSize.getWidth(), capSize.getHeight());
             return encoder.encode(image, quality);
         } catch (Exception e) {
             UdtLn.e(" encode jpeg by turbo error: " + e);
@@ -302,5 +310,28 @@ public final class ScreenCapture implements Device.RotationListener {
             UdtLn.e(" get image from bitmap error: " + e);
         }
         return null;
+    }
+
+    private static Size computeCaptureSize(Size origin, int w, int h, int maxSize,int rotation) {
+        if (!UdtOption.sRescaleImage) {
+            return origin;
+        }
+
+        boolean portrait = h > w;
+
+        int major = portrait ? h : w;
+        int minor = portrait ? w : h;
+        if (major > maxSize) {
+            float sw = minor * maxSize / major;
+            minor = (int) (sw / 16 * 16);
+            major = maxSize;
+        }
+        w = portrait ? minor : major;
+        h = portrait ? major : minor;
+        Size s = new Size(w, h);
+        if (rotation % 2 == 0) {
+            return s;
+        }
+        return s.rotate();
     }
 }

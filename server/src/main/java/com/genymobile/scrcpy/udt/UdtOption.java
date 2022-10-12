@@ -1,12 +1,12 @@
 package com.genymobile.scrcpy.udt;
 
-import com.genymobile.scrcpy.Ln;
-
 import java.util.Locale;
 
 public class UdtOption {
     public static Boolean SUPPORT = true;
     public static String SOCKET_NAME = "scrcpy";
+
+    public static boolean sRescaleImage = true;
 
     public static boolean createOptions( String key, String value) {
         switch (key) {
@@ -23,6 +23,9 @@ public class UdtOption {
             case "udt_libs_path":
                 UdtLn.i("udt_libs_path = " + value);
                 System.setProperty(JpgEncoder.LIB_PATH, value);
+                return true;
+            case "scale_image":
+                sRescaleImage = Boolean.parseBoolean(value);
                 return true;
             default:
                 return false;
