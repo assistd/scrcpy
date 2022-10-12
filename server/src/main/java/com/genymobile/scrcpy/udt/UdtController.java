@@ -3,6 +3,7 @@ package com.genymobile.scrcpy.udt;
 import android.content.pm.PackageInfo;
 import android.os.Build;
 import android.os.LocaleList;
+import android.view.IRotationWatcher;
 
 import com.genymobile.scrcpy.DesktopConnection;
 import com.genymobile.scrcpy.Options;
@@ -10,6 +11,7 @@ import com.genymobile.scrcpy.wrappers.PackageManager;
 import com.genymobile.scrcpy.wrappers.ServiceManager;
 
 import com.genymobile.scrcpy.udt.UdtControllerMessageReader.UdtControlMessage;
+import com.genymobile.scrcpy.wrappers.WindowManager;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -30,6 +32,7 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
     private Thread tickCheckThread;
 
     private final ServiceManager serviceManager = new ServiceManager();
+    private WindowManager windowManager;
 
     public UdtController(UdtDevice device, Options options, DesktopConnection connection) {
         UdtLn.i("init udt controller");
@@ -38,6 +41,15 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
         this.connection = connection;
         this.udtSender = new UdtSender(connection);
         running = true;
+        windowManager = serviceManager.newWindowManager();
+        windowManager.registerRotationWatcher(new IRotationWatcher.Stub() {
+            @Override
+            public void onRotationChanged(int rotation) {
+                synchronized (UdtController.this) {
+                    udtSender.pushRotation(rotation);
+                }
+            }
+        }, options.getDisplayId());
     }
 
     public void stop() {
@@ -47,6 +59,7 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
         if (udtSender != null) {
             udtSender.stop();
         }
+        windowManager = null;
     }
 
     public UdtSender getUdtSender() {

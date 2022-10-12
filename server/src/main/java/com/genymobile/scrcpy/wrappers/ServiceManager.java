@@ -122,5 +122,9 @@ public final class ServiceManager {
         }
         return packageManager;
     }
+
+    public WindowManager newWindowManager() {
+        return new WindowManager(getService("window", "android.view.IWindowManager"));
+    }
     //*/
 }
