@@ -117,6 +117,12 @@ public class ScreenEncoder implements Device.RotationListener {
                     // do not call stop() on exception, it would trigger an IllegalStateException
                     codec.stop();
                 } catch (IllegalStateException | IllegalArgumentException e) {
+                    //*/ tencent.kiwimchen. 20220606, support udt action
+                    if (udtDevice != null && udtDevice.getUdtEncoder() != null
+                            && udtDevice.getUdtEncoder().isReqKeyFrame()) {
+                        Ln.i("ignore exception frome keyframe " + e.toString());
+                    } else {
+                    //*/
                     Ln.e("Encoding error: " + e.getClass().getName() + ": " + e.getMessage());
                     if (!downsizeOnError || firstFrameSent) {
                         // Fail immediately
@@ -132,6 +138,9 @@ public class ScreenEncoder implements Device.RotationListener {
                     // Retry with a smaller device size
                     Ln.i("Retrying with -m" + newMaxSize + "...");
                     device.setMaxSize(newMaxSize);
+                    //*/ tencent.kiwimchen. 20220606, support udt action
+                    }
+                    //*/
                     alive = true;
                 } finally {
                     destroyDisplay(display);

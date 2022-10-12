@@ -30,6 +30,7 @@ public class UdtEncoder {
     private static final String KEY_DURATION = "duration";
     private volatile Mode videoMode = Mode.Resume;
     private int bitRate;
+    private volatile boolean reqKeyFrame;
 
     public static boolean setUdtCodecOption(MediaFormat format, CodecOption codecOption) {
         String key = codecOption.getKey();
@@ -65,9 +66,23 @@ public class UdtEncoder {
     public void onReqIDRFrame() {
         UdtLn.i("udt: req IDRFrame now");
         if (waitCodecReady()) {
-            UdtLn.i("udt: update rotation to generate key frame");
-            encoder.onRotationChanged(1);
+            reqKeyFrame = true;
+            if (ScreenEncoder.durationUs > -1) {
+                UdtLn.i("udt: generate key frame by udpate rotaion and wait timeout");
+                encoder.onRotationChanged(1);
+            } else {
+                UdtLn.i("udt: generate key frame by stop codec");
+                try {
+                    codec.stop();
+                } finally {
+                    UdtLn.i("udt: ignore exception from req frame");
+                }
+            }
         }
+    }
+
+    public boolean isReqKeyFrame() {
+        return reqKeyFrame;
     }
 
     public void onPauseVideo(boolean pause) {
@@ -86,20 +101,21 @@ public class UdtEncoder {
     private boolean waitCodecReady() {
         UdtLn.i("udt: wait codec ready");
         int i = 0;
-        while (codec == null && i++ < 2 * 3) {
+        while (codec == null && i++ < 20) {
             UdtLn.i("udt: do wait codec ready");
             try {
-                Thread.sleep(500);
+                Thread.sleep(50);
             } catch (Exception e) {}
         }
         return codec != null;
     }
 
     public boolean onFinish(FileDescriptor fd) {
+        reqKeyFrame = false;
         if (videoMode == Mode.Pause) {
             while (videoMode == Mode.Pause) {
                 try {
-                    Thread.sleep(1000);
+                    Thread.sleep(50);
                 } catch (Exception e) {}
             }
         }
@@ -133,7 +149,7 @@ public class UdtEncoder {
                     }
                     UdtLn.i("support codecs info:, level: " + level.level
                             + ", profile: " + level.profile);
-                    if (level.level > sugguestLevel || sugguestLevel < 0) {
+                    if (level.level < sugguestLevel || sugguestLevel < 0) {
                         sugguestLevel = level.level;
                     }
                 }
