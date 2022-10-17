@@ -79,7 +79,12 @@ public final class Device {
         maxSize = options.getMaxSize();
         lockVideoOrientation = options.getLockVideoOrientation();
 
+        /*/ tencent.kiwimchen. 20220606, support udt action
         screenInfo = ScreenInfo.computeScreenInfo(displayInfo.getRotation(), deviceSize, crop, maxSize, lockVideoOrientation);
+        /*/
+        scale_image = options.getScaleImage();
+        screenInfo = ScreenInfo.computeScreenInfo(displayInfo.getRotation(), deviceSize, crop, maxSize, lockVideoOrientation, scale_image);
+        //*/
         layerStack = displayInfo.getLayerStack();
 
         SERVICE_MANAGER.getWindowManager().registerRotationWatcher(new IRotationWatcher.Stub() {
@@ -135,7 +140,11 @@ public final class Device {
 
     public synchronized void setMaxSize(int newMaxSize) {
         maxSize = newMaxSize;
+        /*/ tencent.kiwimchen. 20220606, support udt action
         screenInfo = ScreenInfo.computeScreenInfo(screenInfo.getReverseVideoRotation(), deviceSize, crop, newMaxSize, lockVideoOrientation);
+        /*/
+        screenInfo = ScreenInfo.computeScreenInfo(screenInfo.getReverseVideoRotation(), deviceSize, crop, newMaxSize, lockVideoOrientation, scale_image);
+        //*/
     }
 
     public synchronized ScreenInfo getScreenInfo() {
@@ -319,4 +328,6 @@ public final class Device {
     public static Settings getSettings() {
         return SETTINGS;
     }
+
+    private boolean scale_image;
 }

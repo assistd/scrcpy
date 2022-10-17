@@ -9,10 +9,13 @@ import android.media.MediaFormat;
 import android.os.Build;
 
 import com.genymobile.scrcpy.CodecOption;
+import com.genymobile.scrcpy.DesktopConnection;
 import com.genymobile.scrcpy.ScreenEncoder;
 import com.genymobile.scrcpy.Size;
 
 import java.io.FileDescriptor;
+import java.io.IOException;
+import java.util.List;
 
 public class UdtEncoder {
     private final ScreenEncoder encoder;
@@ -28,11 +31,13 @@ public class UdtEncoder {
     }
 
     private MediaCodec codec;
+    private List<CodecOption> codecOptions;
 
     private static final String KEY_DURATION = "duration";
-    private volatile Mode videoMode = Mode.Resume;
+
+    private Mode videoMode = Mode.Resume;
     private int bitRate;
-    private volatile boolean reqKeyFrame;
+    private boolean reqKeyFrame;
 
     public static boolean setUdtCodecOption(MediaFormat format, CodecOption codecOption) {
         String key = codecOption.getKey();
@@ -48,6 +53,7 @@ public class UdtEncoder {
     }
 
     public void onInit(MediaCodec codec) {
+        UdtLn.i("udt: init codec" + codec.getName());
         this.codec = codec;
     }
 
@@ -69,16 +75,20 @@ public class UdtEncoder {
         UdtLn.i("udt: req IDRFrame now");
         if (waitCodecReady()) {
             reqKeyFrame = true;
-            if (ScreenEncoder.durationUs > -1) {
-                UdtLn.i("udt: generate key frame by udpate rotaion and wait timeout");
-                encoder.onRotationChanged(1);
-            } else {
-                UdtLn.i("udt: generate key frame by stop codec");
-                try {
-                    codec.stop();
-                } finally {
-                    UdtLn.i("udt: ignore exception from req frame");
-                }
+            videoMode = Mode.Resume;
+            resetCodec();
+        }
+    }
+
+    private void resetCodec() {
+        if (ScreenEncoder.durationUs > -1) {
+            UdtLn.i("udt: generate key frame by udpate rotation and wait timeout");
+            encoder.onRotationChanged(0);
+        } else {
+            UdtLn.i("udt: generate key frame by udpate rotation and flush codec if need");
+            encoder.onRotationChanged(0);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                startResetThread();
             }
         }
     }
@@ -88,11 +98,15 @@ public class UdtEncoder {
     }
 
     public void onPauseVideo(boolean pause) {
-        UdtLn.i("udt: pause video thread: " + pause);
+        UdtLn.i("udt: pauseing video thread: " + pause);
             videoMode = pause ? Mode.Pause : Mode.Resume;
         if (waitCodecReady()) {
-            encoder.onRotationChanged(1);
+            reqKeyFrame = true;
+            UdtLn.i("udt: pausing video by reset");
+            resetCodec();
+            UdtLn.i("udt: pausing video by reset");
         }
+        UdtLn.i("udt: paused video thread");
     }
 
     public void onExitVideo() {
@@ -117,10 +131,28 @@ public class UdtEncoder {
         if (videoMode == Mode.Pause) {
             while (videoMode == Mode.Pause) {
                 try {
+                    UdtLn.d("udt: wait codec resume");
                     Thread.sleep(50);
                 } catch (Exception e) {}
             }
         }
         return videoMode == Mode.Exit;
+    }
+
+    private void startResetThread() {
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+              if (codec != null) {
+                  try {
+                      codec.flush();
+                      UdtLn.i("udt: stop code");
+                  } catch (Exception e) {
+                      UdtLn.i("udt: ignore exception from stop frame");
+                  }
+              }
+            }
+        });
+        thread.start();
     }
 }

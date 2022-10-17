@@ -163,4 +163,48 @@ public final class ScreenInfo {
         }
         return (lockedVideoOrientation + 4 - deviceRotation) % 4;
     }
+
+    //*/ tencent.kiwimchen. 20220606, support udt action
+    public static ScreenInfo computeScreenInfo(int rotation, Size deviceSize, Rect crop, int maxSize, int lockedVideoOrientation, boolean scale_image) {
+        if (lockedVideoOrientation == Device.LOCK_VIDEO_ORIENTATION_INITIAL) {
+            // The user requested to lock the video orientation to the current orientation
+            lockedVideoOrientation = rotation;
+        }
+
+        Rect contentRect = new Rect(0, 0, deviceSize.getWidth(), deviceSize.getHeight());
+        if (crop != null) {
+            if (rotation % 2 != 0) { // 180s preserve dimensions
+                // the crop (provided by the user) is expressed in the natural orientation
+                crop = flipRect(crop);
+            }
+            if (!contentRect.intersect(crop)) {
+                // intersect() changes contentRect so that it is intersected with crop
+                Ln.w("Crop rectangle (" + formatCrop(crop) + ") does not intersect device screen (" + formatCrop(deviceSize.toRect()) + ")");
+                contentRect = new Rect(); // empty
+            }
+        }
+
+        if (scale_image) {
+            Size videoSize = computeImageSize(contentRect.width(), contentRect.height(), maxSize);
+            return new ScreenInfo(contentRect, videoSize, rotation, lockedVideoOrientation);
+        }
+        Size videoSize = computeVideoSize(contentRect.width(), contentRect.height(), maxSize);
+        return new ScreenInfo(contentRect, videoSize, rotation, lockedVideoOrientation);
+    }
+
+    private static Size computeImageSize(int w, int h, int maxSize) {
+        boolean portrait = h > w;
+
+        int major = portrait ? h : w;
+        int minor = portrait ? w : h;
+        if (major > maxSize) {
+            float sw = minor * maxSize / major;
+            minor = (int) (sw / 16 * 16);
+            major = maxSize;
+        }
+        w = portrait ? minor : major;
+        h = portrait ? major : minor;
+        return new Size(w, h);
+    }
+    //*/
 }

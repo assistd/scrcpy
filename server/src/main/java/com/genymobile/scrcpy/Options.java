@@ -196,4 +196,15 @@ public class Options {
     public void setSendDummyByte(boolean sendDummyByte) {
         this.sendDummyByte = sendDummyByte;
     }
+
+    //*/ tencent.kiwimchen. 20220606, support udt action
+    private boolean scale_image;
+    public void setScaleImage(boolean scale) {
+        scale_image = scale;
+    }
+
+    public boolean getScaleImage() {
+        return scale_image;
+    }
+    //*/
 }

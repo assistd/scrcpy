@@ -77,7 +77,7 @@ public final class JpgEncoder {
         TJCompressor tJCompressor = compressor;
         if (tJCompressor != null) {
             tJCompressor.setJPEGQuality(quality);
-            tJCompressor.setSourceImage(bArr, 0, 0, maxWidth, rowStride, maxHeight, convertFormat);
+            tJCompressor.setSourceImage(bArr, 0, 0, image.getWidth(), rowStride, image.getHeight(), convertFormat);
             tJCompressor.compress(encodedData, 3072);
             return new JpgData(encodedData, tJCompressor.getCompressedSize());
         }
