@@ -7,6 +7,7 @@ public class UdtOption {
     public static String SOCKET_NAME = "scrcpy";
 
     public static boolean sRescaleImage = true;
+    public static boolean sRotationAutoSync = false;
 
     public static boolean createOptions( String key, String value) {
         switch (key) {
@@ -27,6 +28,8 @@ public class UdtOption {
             case "scale_image":
                 sRescaleImage = Boolean.parseBoolean(value);
                 return true;
+            case "rotation_autosync":
+                sRotationAutoSync = Boolean.parseBoolean(value);
             default:
                 return false;
         }

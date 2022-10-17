@@ -41,15 +41,17 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
         this.connection = connection;
         this.udtSender = new UdtSender(connection);
         running = true;
-        windowManager = serviceManager.newWindowManager();
-        windowManager.registerRotationWatcher(new IRotationWatcher.Stub() {
-            @Override
-            public void onRotationChanged(int rotation) {
-                synchronized (UdtController.this) {
-                    udtSender.pushRotation(rotation);
+        if (UdtOption.sRotationAutoSync) {
+            windowManager = serviceManager.newWindowManager();
+            windowManager.registerRotationWatcher(new IRotationWatcher.Stub() {
+                @Override
+                public void onRotationChanged(int rotation) {
+                    synchronized (UdtController.this) {
+                        udtSender.pushRotation(rotation);
+                    }
                 }
-            }
-        }, options.getDisplayId());
+            }, options.getDisplayId());
+        }
     }
 
     public void stop() {
