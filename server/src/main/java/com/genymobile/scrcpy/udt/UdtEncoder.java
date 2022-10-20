@@ -12,6 +12,7 @@ import com.genymobile.scrcpy.CodecOption;
 import com.genymobile.scrcpy.DesktopConnection;
 import com.genymobile.scrcpy.ScreenEncoder;
 import com.genymobile.scrcpy.Size;
+import com.genymobile.scrcpy.StringUtils;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
@@ -31,9 +32,15 @@ public class UdtEncoder {
     }
 
     private MediaCodec codec;
-    private List<CodecOption> codecOptions;
 
     private static final String KEY_DURATION = "duration";
+
+    private static final String KEY_LEVEL = "level"; //@see MediaFormat.KEY_LEVEL
+    private static final String KEY_PROFILE = "profile"; //@see MediaFormat.KEY_PROFILE
+
+    private static final int SugguestCodecProfile = MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline;
+    private static int sSuggestCodecLevel = -1;
+    private static int sSuggestMaxCodecLevel = MediaCodecInfo.CodecProfileLevel.AVCLevel62;
 
     private Mode videoMode = Mode.Resume;
     private int bitRate;
@@ -41,15 +48,34 @@ public class UdtEncoder {
 
     public static boolean setUdtCodecOption(MediaFormat format, CodecOption codecOption) {
         String key = codecOption.getKey();
-        if (KEY_DURATION.equals(key)) {
-            Object value = codecOption.getValue();
-            if (value instanceof Integer) {
-                ScreenEncoder.durationUs = (Integer) value * 1000 * 1000;
-                UdtLn.d("udt: codec option " + key + " (" + value.getClass().getSimpleName() + ") = " + value);
-                return true;
-            }
+        switch (key) {
+            case KEY_DURATION:
+                Object value = codecOption.getValue();
+                if (value instanceof Integer) {
+                    ScreenEncoder.durationUs = (Integer) value * 1000 * 1000;
+                    UdtLn.d("udt: codec option " + key + " (" + value.getClass().getSimpleName() + ") = " + value);
+                    return true;
+                }
+                return false;
+            case KEY_PROFILE:
+                return UdtOption.sUseSuggestCodec;
+            case KEY_LEVEL:
+                if (UdtOption.sUseSuggestCodec) {
+                    chooseCodecLevel();
+                    if (sSuggestCodecLevel > 0) {
+                        format.setInteger(KEY_PROFILE, SugguestCodecProfile);
+                        format.setInteger(KEY_LEVEL, sSuggestCodecLevel);
+                        UdtLn.w("use suggest codec info, profile: " + SugguestCodecProfile
+                                + ",level:"+ sSuggestCodecLevel);
+                    } else {
+                        UdtLn.w("use system default codec info");
+                    }
+                    return true;
+                }
+                return false;
+            default:
+                return false;
         }
-        return false;
     }
 
     public void onInit(MediaCodec codec) {
@@ -95,6 +121,19 @@ public class UdtEncoder {
 
     public boolean isReqKeyFrame() {
         return reqKeyFrame;
+    }
+
+    public boolean isCustomCodec() {
+        return UdtOption.sUseSuggestCodec;
+    }
+
+    public boolean downCodecLevel(String reason) {
+        if (sSuggestCodecLevel >0 && reason.contains("CodecException: Error 0xffffffc3")) {
+            sSuggestMaxCodecLevel = sSuggestCodecLevel;
+            sSuggestCodecLevel = -1;
+            return true;
+        }
+        return false;
     }
 
     public void onPauseVideo(boolean pause) {
@@ -154,5 +193,40 @@ public class UdtEncoder {
             }
         });
         thread.start();
+    }
+
+    private static final String mimeType = MIMETYPE_VIDEO_AVC;
+
+    public static void chooseCodecLevel()  {
+        if (sSuggestCodecLevel > -1) {
+            return;
+        }
+
+        int numCodecs = MediaCodecList.getCodecCount();
+        for (int i = 0; i < numCodecs; i++) {
+            MediaCodecInfo codecInfo = MediaCodecList.getCodecInfoAt(i);
+            if (!codecInfo.isEncoder()) {
+                continue;
+            }
+            String[] types = codecInfo.getSupportedTypes();
+            for (int j = 0; j < types.length; j++) {
+                if (!types[j].equalsIgnoreCase(mimeType)) {
+                    continue;
+                }
+                for (MediaCodecInfo.CodecProfileLevel level :
+                        codecInfo.getCapabilitiesForType(mimeType).profileLevels) {
+                    if (level.profile != SugguestCodecProfile) {
+                        continue;
+                    }
+                    UdtLn.d("dump codecs info:, level: " + level.level
+                            + ", profile: " + level.profile);
+                    if (level.level > sSuggestCodecLevel && level.level < sSuggestMaxCodecLevel
+                            || sSuggestCodecLevel < 0) {
+                        sSuggestCodecLevel = level.level;
+                    }
+                }
+                break;
+            }
+        }
     }
 }

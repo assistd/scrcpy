@@ -8,6 +8,7 @@ public class UdtOption {
 
     public static boolean sRescaleImage = true;
     public static boolean sRotationAutoSync = false;
+    public static boolean sUseSuggestCodec = true;
 
     public static boolean createOptions( String key, String value) {
         switch (key) {
@@ -30,6 +31,10 @@ public class UdtOption {
                 return true;
             case "rotation_autosync":
                 sRotationAutoSync = Boolean.parseBoolean(value);
+                return true;
+            case "disable_suggest_codec":
+                sUseSuggestCodec = Boolean.parseBoolean(value);
+                return true;
             default:
                 return false;
         }
