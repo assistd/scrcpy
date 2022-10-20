@@ -218,7 +218,7 @@ public final class ScreenCapture implements Device.RotationListener {
                     if (data != null) {
                         l.onImageAvailable(data.data, data.size);
                     } else {
-                        l.onImageAvailable(null, 0);
+                        l.onImageAvailable(new byte[]{1}, 1);
                     }
                     listeners.remove(l);
                 }

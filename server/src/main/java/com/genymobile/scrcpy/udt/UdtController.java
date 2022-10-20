@@ -30,6 +30,7 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
     private long lastTickCheck = 0;
     private long lastTickCount = 0;
     private Thread tickCheckThread;
+    private byte[] lastImage;
 
     private final ServiceManager serviceManager = new ServiceManager();
     private WindowManager windowManager;
@@ -163,19 +164,27 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
                 UdtLn.i("screencap image available, send size: " + size);
                 udtSender.pushCaptureImage(bitmap, size);
                 snapshotOnce = false;
+                cacheLastImage(bitmap, size);
                 notify();
             }
         }
     }
 
+    private void cacheLastImage(byte[] bitmap, int size) {
+        if (size > 0) {
+            lastImage = new byte[size];
+            System.arraycopy(bitmap, 0, lastImage, 0, lastImage.length);
+        }
+    }
+
     private void captureScreen(int height, int quality) {
         UdtLn.i("screencap by height: " + height + ", quality" + quality);
+        int count = 0;
+        int maxCount = 30; //3s
         try {
             ScreenCapture.getInstance().addListener(this);
             ScreenCapture.getInstance().setConfig(height, quality, options);
             snapshotOnce = true;
-            int count = 0;
-            int maxCount = 50; //5s
             synchronized (this) {
                 // wait
                 while (snapshotOnce && running) {
@@ -185,16 +194,24 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
                         } catch (Exception e) {
                         }
                     } else {
-                        UdtLn.i("screencap failed by timeout ( >5s )");
                         break;
                     }
-                }
-                if (count < maxCount) {
-                    UdtLn.i("screencap success, send image onImageAvailable");
                 }
             }
         } finally {
             ScreenCapture.getInstance().rmListener(this);
+            if (count < maxCount) {
+                UdtLn.d("screencap success, send image onImageAvailable");
+            } else {
+                UdtLn.w("screencap failed by timeout ( >3s )");
+                if (lastImage != null && lastImage.length > 0) {
+                    synchronized (this) {
+                        udtSender.pushCaptureImage(lastImage, lastImage.length);
+                    }
+                } else {
+                    udtSender.pushCaptureImage(new byte[]{1}, 1);
+                }
+            }
         }
     }
 
