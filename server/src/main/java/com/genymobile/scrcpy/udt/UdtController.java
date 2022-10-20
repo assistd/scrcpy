@@ -18,22 +18,22 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Locale;
 
-public class UdtController implements ScreenCapture.OnImageAvailableListener {
+public class UdtController {
     private UdtDevice device;
     private Options options;
     private UdtSender udtSender;
     private DesktopConnection connection;
-    private boolean snapshotOnce;
     private boolean running;
 
     private long lastTick = 0;
     private long lastTickCheck = 0;
     private long lastTickCount = 0;
     private Thread tickCheckThread;
-    private byte[] lastImage;
 
     private final ServiceManager serviceManager = new ServiceManager();
     private WindowManager windowManager;
+
+    private ScreenCapture screenCapture;
 
     public UdtController(UdtDevice device, Options options, DesktopConnection connection) {
         UdtLn.i("init udt controller");
@@ -58,7 +58,6 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
     public void stop() {
         UdtLn.i("stop udt controller");
         running = false;
-        ScreenCapture.getInstance().rmListener(this);
         if (udtSender != null) {
             udtSender.stop();
         }
@@ -89,9 +88,7 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
                 onTick(connection, System.currentTimeMillis());
                 return true;
             case UdtControlMessage.TYPE_CAPTURE_DEVICE:
-                int height = udtMsg.getCapHeight();
-                int quality = udtMsg.getCapQuality();
-                captureScreen(height, quality);
+                captureScreen(udtMsg.getCapHeight(), udtMsg.getCapQuality());
                 return true;
             case UdtControlMessage.TYPE_PAUSE_VIDEO:
             case UdtControlMessage.TYPE_RESUME_VIDEO:
@@ -156,63 +153,17 @@ public class UdtController implements ScreenCapture.OnImageAvailableListener {
         return thread;
     }
 
-
-    @Override
-    public void onImageAvailable(byte[] bitmap, int size) {
-        synchronized (this) {
-            if (snapshotOnce) {
-                UdtLn.i("screencap image available, send size: " + size);
-                udtSender.pushCaptureImage(bitmap, size);
-                snapshotOnce = false;
-                cacheLastImage(bitmap, size);
-                notify();
-            }
-        }
-    }
-
-    private void cacheLastImage(byte[] bitmap, int size) {
-        if (size > 0) {
-            lastImage = new byte[size];
-            System.arraycopy(bitmap, 0, lastImage, 0, lastImage.length);
-        }
-    }
-
     private void captureScreen(int height, int quality) {
-        UdtLn.i("screencap by height: " + height + ", quality" + quality);
-        int count = 0;
-        int maxCount = 30; //3s
-        try {
-            ScreenCapture.getInstance().addListener(this);
-            ScreenCapture.getInstance().setConfig(height, quality, options);
-            snapshotOnce = true;
-            synchronized (this) {
-                // wait
-                while (snapshotOnce && running) {
-                    if (count++ < maxCount) {
-                        try {
-                            wait(100);
-                        } catch (Exception e) {
-                        }
-                    } else {
-                        break;
-                    }
-                }
-            }
-        } finally {
-            ScreenCapture.getInstance().rmListener(this);
-            if (count < maxCount) {
-                UdtLn.d("screencap success, send image onImageAvailable");
-            } else {
-                UdtLn.w("screencap failed by timeout ( >3s )");
-                if (lastImage != null && lastImage.length > 0) {
-                    synchronized (this) {
-                        udtSender.pushCaptureImage(lastImage, lastImage.length);
-                    }
-                } else {
-                    udtSender.pushCaptureImage(new byte[]{1}, 1);
-                }
-            }
+        UdtLn.i("capture screen by height: " + height + ", quality" + quality);
+        if (screenCapture == null) {
+            screenCapture = new ScreenCapture(connection.getVideoFd().hashCode());
         }
+        screenCapture.capture(height, quality, options, new ScreenCapture.OnImageAvailableListener() {
+            @Override
+            public void onImageAvailable(byte[] bitmap, int size) {
+                udtSender.pushCaptureImage(bitmap, size);
+            }
+        });
     }
 
     private void setLocale(String newLocale) {

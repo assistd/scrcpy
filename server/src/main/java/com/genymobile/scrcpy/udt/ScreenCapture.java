@@ -16,17 +16,12 @@ import android.view.Surface;
 import com.genymobile.scrcpy.Device;
 import com.genymobile.scrcpy.Options;
 import com.genymobile.scrcpy.ScreenInfo;
-import com.genymobile.scrcpy.Size;
-import com.genymobile.scrcpy.Workarounds;
 import com.genymobile.scrcpy.wrappers.SurfaceControl;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
-public final class ScreenCapture implements Device.RotationListener {
+public final class ScreenCapture {
     public interface OnImageAvailableListener {
         void onImageAvailable(byte[] bitmap, int size);
     }
@@ -34,30 +29,15 @@ public final class ScreenCapture implements Device.RotationListener {
     private static final String TAG = "screencap:";
     private static final boolean ENCODE_FROM_JPEG_TURBO = true;
 
-    private int height, quality;
-    private Options options;
-    private static int count = 0;
-    private Size capSize;
+    private int fd;
 
     private Handler backgroundHandler;
-    private IBinder display;
     private JpgEncoder encoder;
 
-    private final List<OnImageAvailableListener> listeners = new ArrayList<>();
-
-    private static final ScreenCapture sScreenCapture = new ScreenCapture();
-
-    private final AtomicBoolean running = new AtomicBoolean();
-    private final AtomicBoolean rotationChanged = new AtomicBoolean();
-    private boolean imageReaderReady = false;
-    private JpgEncoder.JpgData data;
-
-    public static ScreenCapture getInstance() {
-        return sScreenCapture;
-    }
-
-    ScreenCapture() {
+    public ScreenCapture(int fd) {
         UdtLn.i("init ScreenCapture once");
+        startLoopThread();
+        this.fd = fd;
     }
 
     private void startLoopThread() {
@@ -66,171 +46,72 @@ public final class ScreenCapture implements Device.RotationListener {
             public void run() {
                 Looper.prepare();
                 HandlerThread backgroundThread =
-                        new HandlerThread("udt-cap", android.os.Process
+                        new HandlerThread("udt-cap-" + fd, android.os.Process
                                 .THREAD_PRIORITY_BACKGROUND);
                 backgroundThread.start();
                 backgroundHandler = new Handler(backgroundThread.getLooper());
-                prepare();
                 Looper.loop();
             }
         }.start();
     }
 
-    @Override
-    public void onRotationChanged(int rotation) {
-        rotationChanged.set(true);
-    }
-
-    public boolean consumeRotationChange() {
-        return rotationChanged.getAndSet(false);
-    }
-
-    public synchronized void setConfig(int height, int quality, Options options) {
-        if (this.height == 0) {
-            UdtLn.i(TAG + " init config, height = " + height + " quality =" +quality);
-            this.height = height;
-            this.quality = quality;
-            this.options = options;
-            running.set(true);
-            startLoopThread();
-            notify();
-        } if (this.height != height || this.quality != quality) {
-            UdtLn.i(TAG + " update config,"
-                    + " new height = " + height + " old height = " + this.height
-                    + ", new quality =" +quality + " old quality =" + this.quality
-            );
-            this.height = height;
-            this.quality = quality;
-            this.options = options;
-            rotationChanged.set(true);
-        } else {
-            UdtLn.d(TAG + " no need update config, height = " + height + " quality =" +quality);
-        }
-    }
-
-    public synchronized void addListener(OnImageAvailableListener listener) {
-        UdtLn.d(TAG + " add listener = " + listener + ", imageReaderReady = " + imageReaderReady);
-        listeners.add(listener);
-        if (imageReaderReady) {
-            notify();
-        }
-    }
-
-    public synchronized void rmListener(OnImageAvailableListener listener) {
-        UdtLn.d(TAG + " rm listener = " + listener);
-        listeners.remove(listener);
-        notify();
-    }
-
     @TargetApi(Build.VERSION_CODES.KITKAT)
-    public void prepare() {
-        Workarounds.prepareMainLooper();
-        UdtLn.i(TAG + " prepare to capture");
-        do {
-            synchronized (this) {
-                while (!running.get()) {
-                    try {
-                         wait(60 * 1000);
-                         UdtLn.d(TAG + " wait for config ready");
-                     } catch (Exception e) {}
-                }
-            }
-            options.setMaxSize(height);
-            options.setScaleImage(UdtOption.sRescaleImage);
+    public void capture(int height, int quality, Options options, OnImageAvailableListener listener) {
+        options.setMaxSize(height);
+        options.setScaleImage(UdtOption.sRescaleImage);
 
-            Device device = new Device(options);
-            device.setRotationListener(this);
+        Device device = new Device(options);
+        IBinder display = createDisplay(fd);
+        ScreenInfo screenInfo = device.getScreenInfo();
+        int w = screenInfo.getVideoSize().getWidth();
+        int h = screenInfo.getVideoSize().getHeight();
+        Rect contentRect = screenInfo.getContentRect();
+        // does not include the locked video orientation
+        Rect unlockedVideoRect = screenInfo.getUnlockedVideoSize().toRect();
+        int videoRotation = screenInfo.getVideoRotation();
+        int layerStack = device.getLayerStack();
+        ImageReader imageReader = ImageReader.newInstance(w, h, PixelFormat.RGBA_8888, 2);
 
-            display = createDisplay();
-            ScreenInfo screenInfo = device.getScreenInfo();
-            final int width = screenInfo.getVideoSize().getWidth();
-            final int height = screenInfo.getVideoSize().getHeight();
-            Rect contentRect = screenInfo.getContentRect();
-            // does not include the locked video orientation
-            Rect unlockedVideoRect = screenInfo.getUnlockedVideoSize().toRect();
-            int videoRotation = screenInfo.getVideoRotation();
-            int layerStack = device.getLayerStack();
-            ImageReader imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2);
+        UdtLn.i(TAG + " config:" + " cr" + contentRect.toString()
+                + " vw: " + w + " vh: " + h + " o: " + videoRotation);
 
-            UdtLn.i(TAG + " init config:"
-                    + " contentRect" + contentRect.toString()
-                    + " videoW: " + width + " videoH: " + height
-                    + " ori: " + videoRotation);
+        setDisplaySurface(display, imageReader.getSurface(), videoRotation, contentRect, unlockedVideoRect, layerStack);
+        imageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
+            @Override
+            public void onImageAvailable(ImageReader reader) {
+                try (Image image = reader.acquireLatestImage()) {
+                    if (image != null) {
+                        JpgEncoder.JpgData data;
+                        if (ENCODE_FROM_JPEG_TURBO) {
+                            data = getJpegFromEncoder(image, quality);
+                        } else {
+                            data = getJpegFromBitmap(image, quality);
+                        }
+                        image.close();
 
-            setDisplaySurface(display, imageReader.getSurface(), videoRotation, contentRect, unlockedVideoRect, layerStack);
-            imageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
-                @Override
-                public void onImageAvailable(ImageReader reader) {
-                    synchronized (ScreenCapture.this) {
-                        UdtLn.i(TAG + " image reader is ready");
-                        imageReaderReady = true;
-                        ScreenCapture.this.notify();
+                        if (listener != null) {
+                            if (data != null) {
+                                listener.onImageAvailable(data.data, data.size);
+                            } else {
+                                UdtLn.e(TAG + "acquire Latest Image failed by image is null");
+                                listener.onImageAvailable(new byte[]{1}, 1);
+                            }
+                        }
                     }
+                } catch (Exception e) {
+                    UdtLn.e(TAG + "acquire Latest Image failed by image by " + e);
+                } finally {
+                    destroyDisplay(display);
+                    reader.close();
                 }
-            }, backgroundHandler);
-            UdtLn.i(TAG + " start loop to capture");
-
-            try {
-                handleImage(imageReader);
-            } catch (Exception e) {
-            } finally {
-                imageReaderReady = false;
-                data = null;
-                imageReader.close();
-                UdtLn.i(TAG + " destroy capture display");
-                destroyDisplay();
             }
-        } while (running.get());
-        UdtLn.i(TAG + " finish capture device");
+        }, backgroundHandler);
     }
 
-    private void handleImage(ImageReader reader) {
-        UdtLn.i(TAG + " start capture loop");
-        do {
-            synchronized (this) {
-                if (listeners.size() == 0 || !imageReaderReady) {
-                    try {
-                        wait(100);
-                        UdtLn.d(TAG + "wait..., current listeners " + listeners.size()
-                                + ", imageReaderReady " + imageReaderReady);
-                        continue;
-                    } catch (Exception e) {
-                        UdtLn.d(TAG + "wait error " + e);
-                    }
-                 }
-             }
-            UdtLn.d(TAG + " acquire Latest Image for listener: " + listeners.size());
-            Image image = reader.acquireLatestImage();
-            if (image != null) {
-                if (ENCODE_FROM_JPEG_TURBO) {
-                    data = getJpegFromEncoder(image, quality);
-                } else {
-                    data = getJpegFromBitmap(image, quality);
-                }
-                image.close();
-            } else {
-                // use last jpeg data.
-                UdtLn.e(TAG + "acquire Latest Image failed by image is null");
-            }
-
-            synchronized (this) {
-                for (OnImageAvailableListener l : listeners) {
-                    if (data != null) {
-                        l.onImageAvailable(data.data, data.size);
-                    } else {
-                        l.onImageAvailable(new byte[]{1}, 1);
-                    }
-                    listeners.remove(l);
-                }
-            }
-        } while (!consumeRotationChange() && running.get()); // check 2s
-        UdtLn.i(TAG + " exit of capture loop");
-    }
-
-    protected static IBinder createDisplay() {
+    protected static IBinder createDisplay(int fd) {
         boolean secure = Build.VERSION.SDK_INT <= Build.VERSION_CODES.R
                 && !Build.VERSION.CODENAME.equals("S");
-        return SurfaceControl.createDisplay("udt-screencap-" + (count++), secure);
+        return SurfaceControl.createDisplay("udt-screencap-" + (fd++), secure);
     }
 
     private static void setDisplaySurface(IBinder display, Surface surface, int orientation,
@@ -245,11 +126,10 @@ public final class ScreenCapture implements Device.RotationListener {
         }
     }
 
-    public void destroyDisplay() {
+    public void destroyDisplay(IBinder display) {
         try {
             if (display != null) {
                 SurfaceControl.destroyDisplay(display);
-                display = null;
             }
         } catch (Exception e) {
             UdtLn.e(TAG + " destroy display error:" + e);
@@ -261,25 +141,12 @@ public final class ScreenCapture implements Device.RotationListener {
             if (encoder == null) {
                 encoder = new JpgEncoder();
             }
-
             encoder.allocate(image.getWidth(), image.getHeight());
             return encoder.encode(image, quality);
         } catch (Exception e) {
             UdtLn.e(" encode jpeg by turbo error: " + e);
         }
         return null;
-    }
-
-    // ScreenCapture run singleton, no need call free.
-    public void free() {
-        if (encoder != null) {
-            try {
-                encoder.free();
-                encoder = null;
-            } catch (Exception e) {
-                UdtLn.e("free jpg encoder error: " + e);
-            }
-        }
     }
 
     private Bitmap createBitmap(Image image, int width, int height) {
