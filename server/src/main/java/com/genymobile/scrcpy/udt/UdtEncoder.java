@@ -6,17 +6,11 @@ import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.media.MediaFormat;
-import android.os.Build;
 
 import com.genymobile.scrcpy.CodecOption;
-import com.genymobile.scrcpy.DesktopConnection;
 import com.genymobile.scrcpy.ScreenEncoder;
-import com.genymobile.scrcpy.Size;
-import com.genymobile.scrcpy.StringUtils;
 
 import java.io.FileDescriptor;
-import java.io.IOException;
-import java.util.List;
 
 public class UdtEncoder {
     private final ScreenEncoder encoder;
@@ -40,11 +34,11 @@ public class UdtEncoder {
 
     private static final int SugguestCodecProfile = MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline;
     private static int sSuggestCodecLevel = -1;
+    private static int sSuggestCodecFailedCount = 0;
     private static int sSuggestMaxCodecLevel = MediaCodecInfo.CodecProfileLevel.AVCLevel62;
 
     private Mode videoMode = Mode.Resume;
     private int bitRate;
-    private boolean reqKeyFrame;
 
     public static boolean setUdtCodecOption(MediaFormat format, CodecOption codecOption) {
         String key = codecOption.getKey();
@@ -65,10 +59,10 @@ public class UdtEncoder {
                     if (sSuggestCodecLevel > 0) {
                         format.setInteger(KEY_PROFILE, SugguestCodecProfile);
                         format.setInteger(KEY_LEVEL, sSuggestCodecLevel);
-                        UdtLn.w("use suggest codec info, profile: " + SugguestCodecProfile
+                        UdtLn.i("use suggest codec info, profile: " + SugguestCodecProfile
                                 + ",level:"+ sSuggestCodecLevel);
                     } else {
-                        UdtLn.w("use system default codec info");
+                        UdtLn.i("use system default codec info");
                     }
                     return true;
                 }
@@ -100,7 +94,6 @@ public class UdtEncoder {
     public void onReqIDRFrame() {
         UdtLn.i("udt: req IDRFrame now");
         if (waitCodecReady()) {
-            reqKeyFrame = true;
             videoMode = Mode.Resume;
             resetCodec();
         }
@@ -108,19 +101,9 @@ public class UdtEncoder {
 
     private void resetCodec() {
         if (ScreenEncoder.durationUs > -1) {
-            UdtLn.i("udt: generate key frame by udpate rotation and wait timeout");
+            UdtLn.i("udt: generate key frame by update rotation and wait timeout");
             encoder.onRotationChanged(0);
-        } else {
-            UdtLn.i("udt: generate key frame by udpate rotation and flush codec if need");
-            encoder.onRotationChanged(0);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                startResetThread();
-            }
         }
-    }
-
-    public boolean isReqKeyFrame() {
-        return reqKeyFrame;
     }
 
     public boolean isCustomCodec() {
@@ -128,9 +111,14 @@ public class UdtEncoder {
     }
 
     public boolean downCodecLevel(String reason) {
-        if (sSuggestCodecLevel >0 && reason.contains("CodecException: Error 0xffffffc3")) {
-            sSuggestMaxCodecLevel = sSuggestCodecLevel;
-            sSuggestCodecLevel = -1;
+        if (sSuggestCodecLevel >0) {
+            if (reason.contains("CodecException: Error 0xffffffc3")) {
+                sSuggestMaxCodecLevel = sSuggestCodecLevel;
+                sSuggestCodecLevel = -1;
+            } else if (sSuggestCodecFailedCount++ > 3) {
+                UdtLn.i("udt: not use suggest codec");
+                UdtOption.sUseSuggestCodec = false;
+            }
             return true;
         }
         return false;
@@ -140,24 +128,20 @@ public class UdtEncoder {
         UdtLn.i("udt: pauseing video thread: " + pause);
             videoMode = pause ? Mode.Pause : Mode.Resume;
         if (waitCodecReady()) {
-            reqKeyFrame = true;
-            UdtLn.i("udt: pausing video by reset");
             resetCodec();
-            UdtLn.i("udt: pausing video by reset");
         }
-        UdtLn.i("udt: paused video thread");
     }
 
     public void onExitVideo() {
-        UdtLn.i("udt: exit video thread");
+        UdtLn.d("udt: exit video thread");
         videoMode = Mode.Exit;
     }
 
     private boolean waitCodecReady() {
-        UdtLn.i("udt: wait codec ready");
+        UdtLn.d("udt: wait codec ready");
         int i = 0;
         while (codec == null && i++ < 20) {
-            UdtLn.i("udt: do wait codec ready");
+            UdtLn.d("udt: do wait codec ready");
             try {
                 Thread.sleep(50);
             } catch (Exception e) {}
@@ -166,7 +150,6 @@ public class UdtEncoder {
     }
 
     public boolean onFinish(FileDescriptor fd) {
-        reqKeyFrame = false;
         if (videoMode == Mode.Pause) {
             while (videoMode == Mode.Pause) {
                 try {
@@ -176,23 +159,6 @@ public class UdtEncoder {
             }
         }
         return videoMode == Mode.Exit;
-    }
-
-    private void startResetThread() {
-        Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-              if (codec != null) {
-                  try {
-                      codec.flush();
-                      UdtLn.i("udt: stop code");
-                  } catch (Exception e) {
-                      UdtLn.i("udt: ignore exception from stop frame");
-                  }
-              }
-            }
-        });
-        thread.start();
     }
 
     private static final String mimeType = MIMETYPE_VIDEO_AVC;
@@ -218,7 +184,7 @@ public class UdtEncoder {
                     if (level.profile != SugguestCodecProfile) {
                         continue;
                     }
-                    UdtLn.d("dump codecs info:, level: " + level.level
+                    UdtLn.i("dump suggest codecs info:, level: " + level.level
                             + ", profile: " + level.profile);
                     if (level.level > sSuggestCodecLevel && level.level < sSuggestMaxCodecLevel
                             || sSuggestCodecLevel < 0) {

@@ -119,10 +119,8 @@ public class ScreenEncoder implements Device.RotationListener {
                 } catch (IllegalStateException | IllegalArgumentException e) {
                     //*/ tencent.kiwimchen. 20220606, support udt action
                     if (udtDevice != null && udtDevice.getUdtEncoder() != null
-                            &&(udtDevice.getUdtEncoder().isReqKeyFrame()
-                            || udtDevice.getUdtEncoder().isCustomCodec())) {
-                        Ln.i("ignore exception frome keyframe " + e);
-
+                            &&(udtDevice.getUdtEncoder().isCustomCodec())) {
+                        Ln.i("ignore exception from custom codec " + e);
                         //reset format if down codec level
                         if (udtDevice.getUdtEncoder().downCodecLevel(e.toString())) {
                             format = createFormat(bitRate, maxFps, codecOptions);
