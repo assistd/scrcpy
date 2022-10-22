@@ -17,6 +17,10 @@
 #define STR_IMPL_(x) #x
 #define STR(x) STR_IMPL_(x)
 
+//*/ UDT super-assistant
+#define OPT_UDT_SA_MODE            999
+//*/
+
 #define OPT_RENDER_EXPIRED_FRAMES  1000
 #define OPT_WINDOW_TITLE           1001
 #define OPT_PUSH_TARGET            1002
@@ -547,6 +551,16 @@ static const struct sc_option options[] = {
         .text = "Set the initial window height.\n"
                 "Default is 0 (automatic).",
     },
+
+    //*/ UDT super-assistant
+    {
+        .shortopt = 'A',
+        .longopt_id = OPT_UDT_SA_MODE,
+        .longopt = "udt-sa",
+        .text = "Enable the UDT's super-assistant mode\n"
+                "Default is false.",
+    },
+    //*/
 };
 
 static const struct sc_shortcut shortcuts[] = {
@@ -1387,6 +1401,12 @@ parse_args_with_getopt(struct scrcpy_cli_args *args, int argc, char *argv[],
     int c;
     while ((c = getopt_long(argc, argv, optstring, longopts, NULL)) != -1) {
         switch (c) {
+            //*/ UDT super-assistant
+            case OPT_UDT_SA_MODE:
+            case 'A':
+                opts->udt_sa_mode = true;
+                break;
+            //*/
             case 'b':
                 if (!parse_bit_rate(optarg, &opts->bit_rate)) {
                     return false;

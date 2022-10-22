@@ -338,15 +338,16 @@ scrcpy(struct scrcpy_options *options) {
         return SCRCPY_EXIT_FAILURE;
     }
 
-#if 1
-    if (!ios_sc_server_start(&s->server)) {
-        goto end;
-    }
-#else
+    //*/ UDT super-assistant
+    if (options->udt_sa_mode) {
+        if (!ios_sc_server_start(&s->server)) {
+            goto end;
+        }
+    } else
+    //*/
     if (!sc_server_start(&s->server)) {
         goto end;
     }
-#endif
 
     server_started = true;
 
@@ -382,6 +383,9 @@ scrcpy(struct scrcpy_options *options) {
 
     struct sc_file_pusher *fp = NULL;
 
+    //*/ UDT super-assistant
+    if (!options->udt_sa_mode)
+    //*/
     if (options->display && options->control) {
         if (!sc_file_pusher_init(&s->file_pusher, serial,
                                  options->push_target)) {

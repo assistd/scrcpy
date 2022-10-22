@@ -43,7 +43,7 @@ const struct scrcpy_options scrcpy_options_default = {
     .show_touches = false,
     .fullscreen = false,
     .always_on_top = false,
-    .control = false,
+    .control = true,
     .display = true,
     .turn_screen_off = false,
     .key_inject_mode = SC_KEY_INJECT_MODE_MIXED,
@@ -65,4 +65,8 @@ const struct scrcpy_options scrcpy_options_default = {
     .cleanup = true,
     .start_fps_counter = false,
     .power_on = true,
+
+    //*/ UDT super-assistant
+    .udt_sa_mode = false,
+    //*/
 };

@@ -47,6 +47,7 @@ ios_sc_server_connect_to(struct sc_server *server, struct sc_server_info *info) 
     sc_socket video_socket = SC_SOCKET_NONE;
     sc_socket control_socket = SC_SOCKET_NONE;
     const struct sc_server_params *params = &server->params;
+    bool control = server->params.control;
 
     uint32_t tunnel_host = params->tunnel_host;
     if (!tunnel_host) {
@@ -63,6 +64,21 @@ ios_sc_server_connect_to(struct sc_server *server, struct sc_server_info *info) 
                                         tunnel_port);
     if (video_socket == SC_SOCKET_NONE) {
         goto fail;
+    }
+
+    tunnel_port = 21343;
+    if (control) {
+        // we know that the device is listening, we don't need several
+        // attempts
+        control_socket = net_socket();
+        if (control_socket == SC_SOCKET_NONE) {
+            goto fail;
+        }
+        bool ok = net_connect_intr(&server->intr, control_socket,
+                                    tunnel_host, tunnel_port);
+        if (!ok) {
+            goto fail;
+        }
     }
 
     // The sockets will be closed on stop if device_read_info() fails
