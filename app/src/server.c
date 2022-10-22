@@ -298,7 +298,7 @@ connect_and_read_byte(struct sc_intr *intr, sc_socket socket,
     return true;
 }
 
-sc_socket
+static sc_socket
 connect_to_server(struct sc_server *server, unsigned attempts, sc_tick delay,
                   uint32_t host, uint16_t port) {
     do {

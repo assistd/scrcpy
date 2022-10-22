@@ -11,12 +11,8 @@
 #include "util/log.h"
 #include "util/net_intr.h"
 #include "util/process_intr.h"
+#include "util/buffer_util.h"
 #include "util/str.h"
-
-extern sc_socket
-connect_to_server(struct sc_server *server, unsigned attempts, sc_tick delay,
-                  uint32_t host, uint16_t port);
-
 
 static bool
 ios_device_read_info(struct sc_intr *intr, sc_socket device_socket,
@@ -42,43 +38,71 @@ ios_device_read_info(struct sc_intr *intr, sc_socket device_socket,
     return true;
 }
 
+enum udt_conn_type {
+    UDT_CONN_VIDEO,
+    UDT_CONN_CTRL,
+};
+
+static sc_socket
+connect_to_server(struct sc_server *server, enum udt_conn_type conn_type, uint32_t _host, uint16_t _port) {
+    sc_socket _socket = net_socket();
+    if (_socket == SC_SOCKET_NONE) {
+        return _socket;
+    }
+
+    bool ok = net_connect_intr(&server->intr, _socket, _host, _port);
+    if (!ok) {
+        net_close(_socket);
+        LOGW("Could not connect to %u:%d", _host, _port);
+        return SC_SOCKET_NONE;
+    }
+
+// enable with assistd
+#if 0
+    // <length: 4-byte> <json string>
+    char buf[128];
+    int _len = snprintf(&buf[4:], sizeof(buf-4), "{\"serial\":\"%s\",\"conn\":\"%s\"}",
+        conn_type == UDT_CONN_VIDEO ? "video" : "ctrl");
+    assert(_len < sizeof(buf));
+    sc_write32be(buf, _len);
+
+    if (net_send_all(socket, &buf, 4+_len) != 1) {
+        net_close(_socket);
+        return SC_SOCKET_NONE;
+    }
+#endif
+
+    return _socket;
+}
+
 static bool
 ios_sc_server_connect_to(struct sc_server *server, struct sc_server_info *info) {
     sc_socket video_socket = SC_SOCKET_NONE;
     sc_socket control_socket = SC_SOCKET_NONE;
-    const struct sc_server_params *params = &server->params;
-    bool control = server->params.control;
 
+    const struct sc_server_params *params = &server->params;
+    uint16_t port = params->tunnel_port;
     uint32_t tunnel_host = params->tunnel_host;
     if (!tunnel_host) {
         tunnel_host = IPV4_LOCALHOST;
     }
 
-    uint16_t tunnel_port = params->tunnel_port;
-    if (!tunnel_port) {
-        tunnel_port = 21344;
-    }
-    unsigned attempts = 100;
-    sc_tick delay = SC_TICK_FROM_MS(100);
-    video_socket = connect_to_server(server, attempts, delay, tunnel_host,
-                                        tunnel_port);
+    // 1. make a video connection
+    video_socket = connect_to_server(server, UDT_CONN_VIDEO, tunnel_host, port != 0 ? port : 21344);
     if (video_socket == SC_SOCKET_NONE) {
         goto fail;
     }
 
-    tunnel_port = 21343;
-    if (control) {
-        // we know that the device is listening, we don't need several
-        // attempts
-        control_socket = net_socket();
-        if (control_socket == SC_SOCKET_NONE) {
-            goto fail;
-        }
-        bool ok = net_connect_intr(&server->intr, control_socket,
-                                    tunnel_host, tunnel_port);
-        if (!ok) {
-            goto fail;
-        }
+    // read one byte to compatible with android-scrcpy
+    char byte;
+    if (net_recv_intr(&server->intr, video_socket, &byte, 1) != 1) {
+        goto fail;
+    }
+
+    // 2. make a control connection
+    control_socket = connect_to_server(server, UDT_CONN_CTRL, tunnel_host, port != 0 ? port : 21343);
+    if (control_socket == SC_SOCKET_NONE) {
+        goto fail;
     }
 
     // The sockets will be closed on stop if device_read_info() fails
