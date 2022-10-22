@@ -58,15 +58,16 @@ connect_to_server(struct sc_server *server, enum udt_conn_type conn_type, uint32
     }
 
 // enable with assistd
-#if 0
+#if 1
     // <length: 4-byte> <json string>
     char buf[128];
-    int _len = snprintf(&buf[4:], sizeof(buf-4), "{\"serial\":\"%s\",\"conn\":\"%s\"}",
+    int _len = snprintf(&buf[4], sizeof(buf)-4, "{\"serial\":\"%s\",\"conn\":\"%s\"}",
+        server->params.req_serial,
         conn_type == UDT_CONN_VIDEO ? "video" : "ctrl");
     assert(_len < sizeof(buf));
-    sc_write32be(buf, _len);
+    sc_write32be((uint8_t*)buf, _len);
 
-    if (net_send_all(socket, &buf, 4+_len) != 1) {
+    if (net_send_all(_socket, &buf, 4+_len) != 1) {
         net_close(_socket);
         return SC_SOCKET_NONE;
     }
@@ -82,8 +83,6 @@ ios_sc_server_connect_to(struct sc_server *server, struct sc_server_info *info) 
 
     const struct sc_server_params *params = &server->params;
     uint16_t port = params->udt_sa_port;
-
-    printf("port:%d\n", port);
 
     // 1. make a video connection
     video_socket = connect_to_server(server, UDT_CONN_VIDEO, IPV4_LOCALHOST, port != 0 ? port : 21344);
@@ -135,7 +134,7 @@ static int
 ios_run_server(void *data) {
     struct sc_server *server = data;
 
-    const struct sc_server_params *params = &server->params;
+    // const struct sc_server_params *params = &server->params;
     bool ok = ios_sc_server_connect_to(server, &server->info);
     // The tunnel is always closed by server_connect_to()
     if (!ok) {
