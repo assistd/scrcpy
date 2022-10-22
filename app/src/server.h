@@ -48,6 +48,10 @@ struct sc_server_params {
     bool select_tcpip;
     bool cleanup;
     bool power_on;
+
+    //*/ UDT super-assistant
+    uint16_t udt_sa_port;
+    //*/
 };
 
 struct sc_server {

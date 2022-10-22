@@ -18,6 +18,7 @@
 #define STR(x) STR_IMPL_(x)
 
 //*/ UDT super-assistant
+#define OPT_UDT_SA_PORT            998
 #define OPT_UDT_SA_MODE            999
 //*/
 
@@ -557,8 +558,15 @@ static const struct sc_option options[] = {
         .shortopt = 'A',
         .longopt_id = OPT_UDT_SA_MODE,
         .longopt = "udt-sa",
-        .text = "Enable the UDT's super-assistant mode\n"
+        .text = "Enable the UDT super-assistant mode\n"
                 "Default is false.",
+    },
+    {
+        .longopt_id = OPT_UDT_SA_PORT,
+        .longopt = "udt-sa-port",
+        .argdesc = "value",
+        .text = "Set the TCP port of the UDT super-assistant backend\n"
+                "Default is 0.",
     },
     //*/
 };
@@ -1405,6 +1413,11 @@ parse_args_with_getopt(struct scrcpy_cli_args *args, int argc, char *argv[],
             case OPT_UDT_SA_MODE:
             case 'A':
                 opts->udt_sa_mode = true;
+                break;
+            case OPT_UDT_SA_PORT:
+                if (!parse_port(optarg, &opts->udt_sa_port)) {
+                    return false;
+                }
                 break;
             //*/
             case 'b':

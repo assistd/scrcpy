@@ -81,14 +81,12 @@ ios_sc_server_connect_to(struct sc_server *server, struct sc_server_info *info) 
     sc_socket control_socket = SC_SOCKET_NONE;
 
     const struct sc_server_params *params = &server->params;
-    uint16_t port = params->tunnel_port;
-    uint32_t tunnel_host = params->tunnel_host;
-    if (!tunnel_host) {
-        tunnel_host = IPV4_LOCALHOST;
-    }
+    uint16_t port = params->udt_sa_port;
+
+    printf("port:%d\n", port);
 
     // 1. make a video connection
-    video_socket = connect_to_server(server, UDT_CONN_VIDEO, tunnel_host, port != 0 ? port : 21344);
+    video_socket = connect_to_server(server, UDT_CONN_VIDEO, IPV4_LOCALHOST, port != 0 ? port : 21344);
     if (video_socket == SC_SOCKET_NONE) {
         goto fail;
     }
@@ -100,7 +98,7 @@ ios_sc_server_connect_to(struct sc_server *server, struct sc_server_info *info) 
     }
 
     // 2. make a control connection
-    control_socket = connect_to_server(server, UDT_CONN_CTRL, tunnel_host, port != 0 ? port : 21343);
+    control_socket = connect_to_server(server, UDT_CONN_CTRL, IPV4_LOCALHOST, port != 0 ? port : 21343);
     if (control_socket == SC_SOCKET_NONE) {
         goto fail;
     }

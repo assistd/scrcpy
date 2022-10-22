@@ -327,6 +327,10 @@ scrcpy(struct scrcpy_options *options) {
         .tcpip_dst = options->tcpip_dst,
         .cleanup = options->cleanup,
         .power_on = options->power_on,
+
+        //*/ UDT super-assistant
+        .udt_sa_port = options->udt_sa_port,
+        //*/
     };
 
     static const struct sc_server_callbacks cbs = {

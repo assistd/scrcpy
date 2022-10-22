@@ -68,5 +68,6 @@ const struct scrcpy_options scrcpy_options_default = {
 
     //*/ UDT super-assistant
     .udt_sa_mode = false,
+    .udt_sa_port = 0,
     //*/
 };

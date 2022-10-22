@@ -143,6 +143,7 @@ struct scrcpy_options {
 
     //*/ UDT super-assistant
     bool udt_sa_mode;
+    uint16_t udt_sa_port;
     //*/
 };
 
