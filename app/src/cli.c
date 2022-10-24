@@ -556,7 +556,6 @@ static const struct sc_option options[] = {
     //*/ UDT super-assistant
     {
         .shortopt = 'A',
-        .longopt_id = OPT_UDT_SA_MODE,
         .longopt = "udt-sa",
         .text = "Enable the UDT super-assistant mode\n"
                 "Default is false.",
