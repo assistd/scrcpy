@@ -2,6 +2,7 @@ package com.genymobile.scrcpy;
 
 import com.genymobile.scrcpy.udt.UdtController;
 import com.genymobile.scrcpy.udt.UdtControllerMessageReader;
+import com.genymobile.scrcpy.udt.UdtLn;
 import com.genymobile.scrcpy.udt.UdtOption;
 
 import java.io.EOFException;
@@ -72,6 +73,7 @@ public class ControlMessageReader {
                     return parseString();
                 }
             })) {
+                UdtLn.d("handled udt control msg, type= " + String.format("0x%02x", _type));
                 return null;
             }
         }

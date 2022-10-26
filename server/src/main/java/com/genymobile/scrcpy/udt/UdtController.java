@@ -75,7 +75,6 @@ public class UdtController {
         if (udtMsg == null) {
             return false;
         }
-        UdtLn.d("handle udt control msg, type = " + type);
         switch (udtMsg.getType()) {
             case UdtControlMessage.TYPE_REQ_IDR:
                 device.reqIDRFrame();

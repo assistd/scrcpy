@@ -141,7 +141,6 @@ public class UdtEncoder {
         UdtLn.d("udt: wait codec ready");
         int i = 0;
         while (codec == null && i++ < 20) {
-            UdtLn.d("udt: do wait codec ready");
             try {
                 Thread.sleep(50);
             } catch (Exception e) {}
@@ -153,7 +152,6 @@ public class UdtEncoder {
         if (videoMode == Mode.Pause) {
             while (videoMode == Mode.Pause) {
                 try {
-                    UdtLn.d("udt: wait codec resume");
                     Thread.sleep(50);
                 } catch (Exception e) {}
             }
