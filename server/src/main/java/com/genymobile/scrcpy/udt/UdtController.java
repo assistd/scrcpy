@@ -62,6 +62,10 @@ public class UdtController {
             udtSender.stop();
         }
         windowManager = null;
+
+        if (screenCapture != null) {
+            screenCapture.stop();
+        }
     }
 
     public UdtSender getUdtSender() {

@@ -31,8 +31,10 @@ public final class ScreenCapture {
 
     private int fd;
 
+    private ImageReader imageReader;
     private Handler backgroundHandler;
     private JpgEncoder encoder;
+    private JpgEncoder.JpgData lastData;
 
     public ScreenCapture(int fd) {
         UdtLn.i("init ScreenCapture once");
@@ -45,14 +47,19 @@ public final class ScreenCapture {
             @Override
             public void run() {
                 Looper.prepare();
+                String loopName = "udt-cap-" + fd;
                 HandlerThread backgroundThread =
-                        new HandlerThread("udt-cap-" + fd, android.os.Process
-                                .THREAD_PRIORITY_BACKGROUND);
+                        new HandlerThread(loopName, android.os.Process.THREAD_PRIORITY_BACKGROUND);
                 backgroundThread.start();
                 backgroundHandler = new Handler(backgroundThread.getLooper());
                 Looper.loop();
+                UdtLn.i("exit of capture looper: " + loopName);
             }
         }.start();
+    }
+
+    public void stop() {
+        backgroundHandler.getLooper().quit();
     }
 
     @TargetApi(Build.VERSION_CODES.KITKAT)
@@ -70,7 +77,11 @@ public final class ScreenCapture {
         Rect unlockedVideoRect = screenInfo.getUnlockedVideoSize().toRect();
         int videoRotation = screenInfo.getVideoRotation();
         int layerStack = device.getLayerStack();
-        ImageReader imageReader = ImageReader.newInstance(w, h, PixelFormat.RGBA_8888, 2);
+        if (imageReader != null) {
+            imageReader.close();
+            imageReader = null;
+        }
+        imageReader = ImageReader.newInstance(w, h, PixelFormat.RGBA_8888, 2);
 
         UdtLn.i(TAG + " config:" + " cr" + contentRect.toString()
                 + " vw: " + w + " vh: " + h + " o: " + videoRotation);
@@ -79,6 +90,11 @@ public final class ScreenCapture {
         imageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
             @Override
             public void onImageAvailable(ImageReader reader) {
+                if (backgroundHandler == null) {
+                    UdtLn.e(TAG + "looper has stopped, ignore image");
+                    return;
+                }
+
                 try (Image image = reader.acquireLatestImage()) {
                     if (image != null) {
                         JpgEncoder.JpgData data;
@@ -92,9 +108,18 @@ public final class ScreenCapture {
                         if (listener != null) {
                             if (data != null) {
                                 listener.onImageAvailable(data.data, data.size);
+                                if (lastData != null) {
+                                    lastData.free();
+                                }
+                                lastData = data.copy();
+                                data.free();
                             } else {
-                                UdtLn.e(TAG + "acquire Latest Image failed by image is null");
-                                listener.onImageAvailable(new byte[]{1}, 1);
+                                if (lastData != null) {
+                                    UdtLn.e(TAG + "acquire Latest Image failed, use last image " + lastData.size);
+                                    listener.onImageAvailable(lastData.data, lastData.size);
+                                } else {
+                                    listener.onImageAvailable(new byte[]{1}, 1);
+                                }
                             }
                         }
                     }
@@ -126,7 +151,7 @@ public final class ScreenCapture {
         }
     }
 
-    public void destroyDisplay(IBinder display) {
+    private void destroyDisplay(IBinder display) {
         try {
             if (display != null) {
                 SurfaceControl.destroyDisplay(display);

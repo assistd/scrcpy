@@ -35,6 +35,11 @@ public final class JpgEncoder {
             System.arraycopy(data, 0, jpgData.data, 0, size);
             return jpgData;
         }
+        public void free() {
+            if (data != null) {
+                data = null;
+            }
+        }
     }
 
     private int maxHeight;
