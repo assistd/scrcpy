@@ -6,7 +6,7 @@ public class UdtOption {
     public static Boolean SUPPORT = true;
     public static String SOCKET_NAME = "scrcpy";
 
-    public static boolean sRescaleImage = true;
+    public static boolean sRescaleImage = false;
     public static boolean sRotationAutoSync = false;
 
     public static boolean createOptions( String key, String value) {

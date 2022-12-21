@@ -105,6 +105,7 @@ public class ScreenEncoder implements Device.RotationListener {
                 int videoRotation = screenInfo.getVideoRotation();
                 int layerStack = device.getLayerStack();
                 setSize(format, videoRect.width(), videoRect.height());
+                Ln.i("format info " + format.toString());
 
                 Surface surface = null;
                 try {
