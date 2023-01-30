@@ -119,20 +119,6 @@ public class ScreenEncoder implements Device.RotationListener {
                     codec.stop();
                 } catch (IllegalStateException | IllegalArgumentException e) {
                     Ln.e("Encoding error: " + e.getClass().getName() + ": " + e.getMessage());
-                    if (!downsizeOnError || firstFrameSent) {
-                        // Fail immediately
-                        throw e;
-                    }
-
-                    int newMaxSize = chooseMaxSizeFallback(screenInfo.getVideoSize());
-                    if (newMaxSize == 0) {
-                        // Definitively fail
-                        throw e;
-                    }
-
-                    // Retry with a smaller device size
-                    Ln.i("Retrying with -m" + newMaxSize + "...");
-                    device.setMaxSize(newMaxSize);
                     alive = true;
                 } finally {
                     destroyDisplay(display);

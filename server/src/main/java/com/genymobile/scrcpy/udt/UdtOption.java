@@ -9,6 +9,12 @@ public class UdtOption {
     public static boolean sRescaleImage = false;
     public static boolean sRotationAutoSync = false;
 
+    private static final String DEFAULT_UDT_LIB_PATH = "/data/local/tmp/udt/";
+
+    static {
+        System.setProperty(JpgEncoder.LIB_PATH, DEFAULT_UDT_LIB_PATH);
+    }
+
     public static boolean createOptions( String key, String value) {
         switch (key) {
             case "udt_enable":

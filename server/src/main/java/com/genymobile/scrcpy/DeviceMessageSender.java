@@ -39,6 +39,8 @@ public final class DeviceMessageSender {
                 ack = DeviceMessage.SEQUENCE_INVALID;
             }
 
+            Ln.i("send text: " + text + ", ack:" + ack );
+
             if (sequence != DeviceMessage.SEQUENCE_INVALID) {
                 DeviceMessage event = DeviceMessage.createAckClipboard(sequence);
                 connection.sendDeviceMessage(event);
