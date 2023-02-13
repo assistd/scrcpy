@@ -203,12 +203,15 @@ public class ScreenEncoder implements Device.RotationListener {
 
         long pts;
         if ((bufferInfo.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
-            pts = -1; // non-media data packet
+            pts = PACKET_FLAG_CONFIG; // non-media data packet
         } else {
             if (ptsOrigin == 0) {
                 ptsOrigin = bufferInfo.presentationTimeUs;
             }
             pts = bufferInfo.presentationTimeUs - ptsOrigin;
+            if ((bufferInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0) {
+                pts |= PACKET_FLAG_KEY_FRAME;
+            }
         }
 
         headerBuffer.putLong(pts);
