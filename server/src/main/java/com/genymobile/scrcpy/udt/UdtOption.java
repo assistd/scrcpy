@@ -1,6 +1,7 @@
 package com.genymobile.scrcpy.udt;
 
 import java.util.Locale;
+import java.util.Objects;
 
 public class UdtOption {
     public static Boolean SUPPORT = true;
@@ -10,6 +11,7 @@ public class UdtOption {
     public static boolean sRotationAutoSync = false;
 
     private static final String DEFAULT_UDT_LIB_PATH = "/data/local/tmp/udt/";
+
 
     static {
         System.setProperty(JpgEncoder.LIB_PATH, DEFAULT_UDT_LIB_PATH);

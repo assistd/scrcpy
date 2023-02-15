@@ -20,6 +20,14 @@ public final class JpgEncoder {
         }
     }
 
+    static JpgEncoder sJpgEncoder;
+    static JpgEncoder getInstance() {
+        if (sJpgEncoder == null) {
+            sJpgEncoder = new JpgEncoder();
+        }
+        return sJpgEncoder;
+    }
+
     public static final class JpgData {
         public byte[] data;
         public int size;
@@ -60,15 +68,19 @@ public final class JpgEncoder {
         return TJ.PF_RGBX;
     }
 
-    public final void allocate(int maxWidth, int maxHeight) throws TJException {
+    private final void allocate(int maxWidth, int maxHeight) throws TJException {
         encodedData = new byte[TJ.bufSize(maxWidth, maxHeight, subsampling)];
         this.maxWidth = maxWidth;
         this.maxHeight = maxHeight;
-        compressor = new TJCompressor();
+        if (compressor == null) {
+            compressor = new TJCompressor();
+        }
         compressor.setSubsamp(subsampling);
     }
 
-    public final JpgData encode(Image image, int quality) throws TJException {
+    public final synchronized JpgData encode(Image image, int quality) throws TJException {
+        allocate(image.getWidth(), image.getHeight());
+
         Image.Plane imagePlane = image.getPlanes()[0];
         int rowStride = imagePlane.getRowStride();
         ByteBuffer buffer = imagePlane.getBuffer();
@@ -79,12 +91,11 @@ public final class JpgEncoder {
                 + " pitch: " + rowStride
                 + " width: " + image.getWidth() + " height: " + image.getHeight()
                 + " format: " + image.getFormat());
-        TJCompressor tJCompressor = compressor;
-        if (tJCompressor != null) {
-            tJCompressor.setJPEGQuality(quality);
-            tJCompressor.setSourceImage(bArr, 0, 0, image.getWidth(), rowStride, image.getHeight(), convertFormat);
-            tJCompressor.compress(encodedData, 3072);
-            return new JpgData(encodedData, tJCompressor.getCompressedSize());
+        if (compressor != null) {
+            compressor.setJPEGQuality(quality);
+            compressor.setSourceImage(bArr, 0, 0, image.getWidth(), rowStride, image.getHeight(), convertFormat);
+            compressor.compress(encodedData, 3072);
+            return new JpgData(encodedData, compressor.getCompressedSize());
         }
         return null;
     }

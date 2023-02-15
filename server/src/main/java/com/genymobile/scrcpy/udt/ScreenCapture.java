@@ -19,11 +19,42 @@ import com.genymobile.scrcpy.ScreenInfo;
 import com.genymobile.scrcpy.wrappers.SurfaceControl;
 
 import java.io.ByteArrayOutputStream;
+import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 
 public final class ScreenCapture {
     public interface OnImageAvailableListener {
         void onImageAvailable(byte[] bitmap, int size);
+    }
+
+    private static class LoopThread extends Thread {
+        WeakReference<ScreenCapture> ScreenCaptureRef;
+        int fd;
+
+        LoopThread(ScreenCapture c, int fd) {
+            ScreenCaptureRef = new WeakReference<>(c);
+            this.fd = fd;
+        }
+
+        @Override
+        public void run() {
+            ScreenCapture capture = ScreenCaptureRef.get();
+            if (capture == null) {
+                return;
+            }
+
+            Looper.prepare();
+            String loopName = "udt-cap-" + System.currentTimeMillis();
+            capture.backgroundThread =
+                    new HandlerThread(loopName, android.os.Process.THREAD_PRIORITY_BACKGROUND);
+            capture.backgroundThread.start();
+            if (capture.backgroundHandler == null) {
+                capture.backgroundHandler = new Handler(capture.backgroundThread.getLooper());
+            }
+            capture.handlerLooper = Looper.myLooper();
+            Looper.loop();
+            UdtLn.i("exit of capture looper: " + loopName);
+        }
     }
 
     private static final String TAG = "screencap:";
@@ -33,8 +64,12 @@ public final class ScreenCapture {
 
     private ImageReader imageReader;
     private Handler backgroundHandler;
-    private JpgEncoder encoder;
+    private HandlerThread backgroundThread;
+    private LoopThread loopThread;
+    private Looper handlerLooper;
     private JpgEncoder.JpgData lastData;
+
+    private static ScreenCapture sScreenCapture;
 
     public ScreenCapture(int fd) {
         UdtLn.i("init ScreenCapture once");
@@ -43,23 +78,21 @@ public final class ScreenCapture {
     }
 
     private void startLoopThread() {
-        new Thread() {
-            @Override
-            public void run() {
-                Looper.prepare();
-                String loopName = "udt-cap-" + fd;
-                HandlerThread backgroundThread =
-                        new HandlerThread(loopName, android.os.Process.THREAD_PRIORITY_BACKGROUND);
-                backgroundThread.start();
-                backgroundHandler = new Handler(backgroundThread.getLooper());
-                Looper.loop();
-                UdtLn.i("exit of capture looper: " + loopName);
-            }
-        }.start();
+        if (loopThread == null) {
+            loopThread = new LoopThread(this, fd);
+            loopThread.start();
+        }
     }
 
     public void stop() {
-        backgroundHandler.getLooper().quit();
+        if (handlerLooper != null) {
+            UdtLn.i("Looper.myLooper().quit");
+            handlerLooper.quit();
+        }
+        if (backgroundHandler.getLooper() != null) {
+            UdtLn.i("backgroundHandler.myLooper().quit");
+            backgroundHandler.getLooper().quit();
+        }
     }
 
     @TargetApi(Build.VERSION_CODES.KITKAT)
@@ -163,11 +196,7 @@ public final class ScreenCapture {
 
     private JpgEncoder.JpgData getJpegFromEncoder(Image image, int quality) {
         try {
-            if (encoder == null) {
-                encoder = new JpgEncoder();
-            }
-            encoder.allocate(image.getWidth(), image.getHeight());
-            return encoder.encode(image, quality);
+            return JpgEncoder.getInstance().encode(image, quality);
         } catch (Exception e) {
             UdtLn.e(" encode jpeg by turbo error: " + e);
         }

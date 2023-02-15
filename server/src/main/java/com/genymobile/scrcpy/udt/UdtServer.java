@@ -13,6 +13,7 @@ import com.genymobile.scrcpy.ScreenEncoder;
 import com.genymobile.scrcpy.Size;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.util.List;
 
 public class UdtServer {
@@ -46,16 +47,21 @@ public class UdtServer {
     }
 
     private static class StreamClient extends Thread {
-        DesktopConnection connection;
+        WeakReference<DesktopConnection> connectionRef;
         Options options;
 
         StreamClient(DesktopConnection connection, Options options) {
-            this.connection = connection;
+            this.connectionRef = new WeakReference<>(connection);
             this.options = options;
         }
 
         @Override
         public void interrupt() {
+            DesktopConnection connection = connectionRef.get();
+            if (connection == null) {
+                return;
+            }
+
             try {
                 connection.close();
             }
@@ -66,6 +72,11 @@ public class UdtServer {
 
         @Override
         public void run() {
+            DesktopConnection connection = connectionRef.get();
+            if (connection == null) {
+                return;
+            }
+
             UdtLn.i("StreamClient start for connect: " + connection);
             List<CodecOption> codecOptions = options.getCodecOptions();
             boolean control = options.getControl();
@@ -84,6 +95,11 @@ public class UdtServer {
                     connection.close();
                 } catch (Exception e1) {
                 }
+
+                if (UdtUtils.DEBUG_MEM) {
+                    UdtUtils.dumpMem();
+                }
+
                 sClientCount--;
                 UdtLn.i("stream stop and last client count: " + sClientCount);
             }

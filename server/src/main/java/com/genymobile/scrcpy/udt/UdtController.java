@@ -3,6 +3,7 @@ package com.genymobile.scrcpy.udt;
 import android.content.pm.PackageInfo;
 import android.os.Build;
 import android.os.LocaleList;
+import android.os.RemoteException;
 import android.view.IRotationWatcher;
 
 import com.genymobile.scrcpy.DesktopConnection;
@@ -14,6 +15,7 @@ import com.genymobile.scrcpy.udt.UdtControllerMessageReader.UdtControlMessage;
 import com.genymobile.scrcpy.wrappers.WindowManager;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Locale;
@@ -44,14 +46,8 @@ public class UdtController {
         running = true;
         if (UdtOption.sRotationAutoSync) {
             windowManager = serviceManager.newWindowManager();
-            windowManager.registerRotationWatcher(new IRotationWatcher.Stub() {
-                @Override
-                public void onRotationChanged(int rotation) {
-                    synchronized (UdtController.this) {
-                        udtSender.pushRotation(rotation);
-                    }
-                }
-            }, options.getDisplayId());
+            windowManager.registerRotationWatcher(new RotationWatcher(this),
+                    options.getDisplayId());
         }
     }
 
@@ -130,28 +126,7 @@ public class UdtController {
 
     private Thread startTickCheckThread(DesktopConnection connection) {
         UdtLn.i("init heartbeat check thread for connect:" + connection);
-        Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                while (running) {
-                    //if 1min not heart from client, check connection is ok
-                    if (Math.abs(System.currentTimeMillis() - lastTick) > 60 * 1000) {
-                        UdtLn.w("no heartbeat from client, close connection," +
-                                " lastTickCount:" +  lastTickCount);
-                        try {
-                            connection.close();
-                        } catch (IOException e) {
-                            UdtLn.e("close connection error " + e);
-                        }
-                        return;
-                    }  else {
-                        try {
-                            Thread.sleep(5 * 1000);
-                        } catch (Exception e) { }
-                    }
-                }
-            }
-        });
+        Thread thread = new TickCheckThread(this, connection);
         thread.start();
         return thread;
     }
@@ -161,7 +136,8 @@ public class UdtController {
         if (screenCapture == null) {
             screenCapture = new ScreenCapture(connection.getVideoFd().hashCode());
         }
-        screenCapture.capture(height, quality, options, new ScreenCapture.OnImageAvailableListener() {
+        screenCapture.capture(height, quality, options,
+                new ScreenCapture.OnImageAvailableListener() {
             @Override
             public void onImageAvailable(byte[] bitmap, int size) {
                 udtSender.pushCaptureImage(bitmap, size);
@@ -214,5 +190,69 @@ public class UdtController {
         int rotation = device.getRotation();
         UdtLn.i("get device rotation: " + rotation);
         udtSender.pushRotation(rotation);
+    }
+
+    private static class RotationWatcher extends IRotationWatcher.Stub {
+        private final WeakReference<UdtController> udtControllerRef;
+
+        RotationWatcher(UdtController udtController) {
+            UdtLn.i("init udt RotationWatcher");
+            udtControllerRef = new WeakReference<>(udtController);
+        }
+
+        @Override
+        public void onRotationChanged(int rotation) throws RemoteException {
+            UdtController controller = udtControllerRef.get();
+            if (controller == null) {
+                return;
+            }
+
+            synchronized (RotationWatcher.this) {
+                controller.udtSender.pushRotation(rotation);
+            }
+        }
+    }
+
+    private static class TickCheckThread extends Thread {
+        WeakReference<DesktopConnection> connectionRef;
+        WeakReference<UdtController> ctrlRef;
+
+        TickCheckThread(UdtController ctrl, DesktopConnection connection) {
+            UdtLn.i("init udt TickCheckThread");
+
+            this.ctrlRef = new WeakReference<>(ctrl);
+            this.connectionRef = new WeakReference<>(connection);
+        }
+
+        @Override
+        public void run() {
+            UdtController ctrl = ctrlRef.get();
+            if (ctrl == null) {
+                return;
+            }
+
+            DesktopConnection connection = connectionRef.get();
+            if (connection == null) {
+                return;
+            }
+
+            while (ctrl.running) {
+                //if 1min not heart from client, check connection is ok
+                if (Math.abs(System.currentTimeMillis() - ctrl.lastTick) > 60 * 1000) {
+                    UdtLn.w("no heartbeat from client, close connection," +
+                            " lastTickCount:" +  ctrl.lastTickCount);
+                    try {
+                        connection.close();
+                    } catch (IOException e) {
+                        UdtLn.e("close connection error " + e);
+                    }
+                    return;
+                }  else {
+                    try {
+                        Thread.sleep(5 * 1000);
+                    } catch (Exception e) { }
+                }
+            }
+        }
     }
 }

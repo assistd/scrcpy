@@ -1,5 +1,6 @@
 package com.genymobile.scrcpy;
 
+import com.genymobile.scrcpy.udt.UdtOption;
 import com.genymobile.scrcpy.wrappers.ClipboardManager;
 import com.genymobile.scrcpy.wrappers.InputManager;
 import com.genymobile.scrcpy.wrappers.ServiceManager;
@@ -10,6 +11,7 @@ import android.content.IOnPrimaryClipChangedListener;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.RemoteException;
 import android.os.SystemClock;
 import android.view.IRotationWatcher;
 import android.view.InputDevice;
@@ -17,6 +19,7 @@ import android.view.InputEvent;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 
+import java.lang.ref.WeakReference;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class Device {
@@ -87,6 +90,10 @@ public final class Device {
         //*/
         layerStack = displayInfo.getLayerStack();
 
+        if (UdtOption.SUPPORT) {
+            SERVICE_MANAGER.getWindowManager().registerRotationWatcher(
+                    new RotationWatcher(this),displayId);
+        } else
         SERVICE_MANAGER.getWindowManager().registerRotationWatcher(new IRotationWatcher.Stub() {
             @Override
             public void onRotationChanged(int rotation) {
@@ -330,4 +337,29 @@ public final class Device {
     }
 
     private boolean scale_image;
+
+    private static class RotationWatcher extends IRotationWatcher.Stub {
+        private final WeakReference<Device> deviceRef;
+
+        RotationWatcher(Device d) {
+            deviceRef = new WeakReference<>(d);
+        }
+
+        @Override
+        public void onRotationChanged(int rotation) throws RemoteException {
+            Device device = deviceRef.get();
+            if (device == null) {
+                return;
+            }
+
+            synchronized (Device.RotationWatcher.this) {
+                device.screenInfo = device.screenInfo.withDeviceRotation(rotation);
+
+                // notify
+                if (device.rotationListener != null) {
+                    device.rotationListener.onRotationChanged(rotation);
+                }
+            }
+        }
+    }
 }
