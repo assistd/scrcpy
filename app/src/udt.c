@@ -15,7 +15,7 @@
 #include "util/str.h"
 
 static bool
-ios_device_read_info(struct sc_intr *intr, sc_socket device_socket,
+udt_device_read_info(struct sc_intr *intr, sc_socket device_socket,
                  struct sc_server_info *info) {
     unsigned char buf[SC_DEVICE_NAME_FIELD_LENGTH + 4];
     ssize_t r = net_recv_all_intr(intr, device_socket, buf, sizeof(buf));
@@ -77,7 +77,7 @@ connect_to_server(struct sc_server *server, enum udt_conn_type conn_type, uint32
 }
 
 static bool
-ios_sc_server_connect_to(struct sc_server *server, struct sc_server_info *info) {
+udt_sc_server_connect_to(struct sc_server *server, struct sc_server_info *info) {
     sc_socket video_socket = SC_SOCKET_NONE;
     sc_socket control_socket = SC_SOCKET_NONE;
 
@@ -103,7 +103,7 @@ ios_sc_server_connect_to(struct sc_server *server, struct sc_server_info *info) 
     }
 
     // The sockets will be closed on stop if device_read_info() fails
-    bool ok = ios_device_read_info(&server->intr, video_socket, info);
+    bool ok = udt_device_read_info(&server->intr, video_socket, info);
     if (!ok) {
         goto fail;
     }
@@ -131,11 +131,11 @@ fail:
 }
 
 static int
-ios_run_server(void *data) {
+udt_run_server(void *data) {
     struct sc_server *server = data;
 
     // const struct sc_server_params *params = &server->params;
-    bool ok = ios_sc_server_connect_to(server, &server->info);
+    bool ok = udt_sc_server_connect_to(server, &server->info);
     // The tunnel is always closed by server_connect_to()
     if (!ok) {
         goto error_connection_failed;
@@ -168,9 +168,9 @@ error_connection_failed:
 }
 
 bool
-ios_sc_server_start(struct sc_server *server) {
+udt_sc_server_start(struct sc_server *server) {
     bool ok =
-        sc_thread_create(&server->thread, ios_run_server, "ios-video", server);
+        sc_thread_create(&server->thread, udt_run_server, "ios-video", server);
     if (!ok) {
         LOGE("Could not create ios-video thread");
         return false;

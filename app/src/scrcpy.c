@@ -36,7 +36,7 @@
 # include "v4l2_sink.h"
 #endif
 
-extern bool ios_sc_server_start(struct sc_server *server);
+extern bool udt_sc_server_start(struct sc_server *server);
 
 struct scrcpy {
     struct sc_server server;
@@ -344,7 +344,7 @@ scrcpy(struct scrcpy_options *options) {
 
     //*/ UDT super-assistant
     if (options->udt_sa_mode) {
-        if (!ios_sc_server_start(&s->server)) {
+        if (!udt_sc_server_start(&s->server)) {
             goto end;
         }
     } else
