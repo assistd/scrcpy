@@ -58,7 +58,7 @@ connect_to_server(struct sc_server *server, enum udt_conn_type conn_type, uint32
     }
 
 // enable with assistd
-#if 0
+#if 1
     // <length: 4-byte> <json string>
     char buf[128];
     int _len = snprintf(&buf[4], sizeof(buf)-4, "{\"serial\":\"%s\",\"conn\":\"%s\"}",
@@ -67,7 +67,7 @@ connect_to_server(struct sc_server *server, enum udt_conn_type conn_type, uint32
     assert(_len < sizeof(buf));
     sc_write32be((uint8_t*)buf, _len);
 
-    if (net_send_all(_socket, &buf, 4+_len) != 1) {
+    if (net_send_all(_socket, &buf, 4+_len) != (4+_len)) {
         net_close(_socket);
         return SC_SOCKET_NONE;
     }
