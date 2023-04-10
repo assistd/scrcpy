@@ -58,7 +58,7 @@ connect_to_server(struct sc_server *server, enum udt_conn_type conn_type, uint32
     }
 
 // enable with assistd
-#if 1
+#if 0
     // <length: 4-byte> <json string>
     char buf[128];
     int _len = snprintf(&buf[4], sizeof(buf)-4, "{\"serial\":\"%s\",\"conn\":\"%s\"}",
