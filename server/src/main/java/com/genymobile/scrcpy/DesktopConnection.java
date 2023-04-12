@@ -37,7 +37,12 @@ public final class DesktopConnection implements Closeable {
             controlInputStream = null;
             controlOutputStream = null;
         }
-        videoFd = videoSocket.getFileDescriptor();
+
+        if (videoSocket != null) {
+            videoFd = videoSocket.getFileDescriptor();
+        } else {
+            videoFd = null;
+        }
     }
 
     private static LocalSocket connect(String abstractName) throws IOException {

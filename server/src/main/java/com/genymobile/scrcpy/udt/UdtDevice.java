@@ -24,7 +24,9 @@ public class UdtDevice {
     private UdtDevice(Device device, DesktopConnection connection, ScreenEncoder encoder, Options options) {
         UdtLn.i("udt: init device");
         this.connection = connection;
-        this.udtEncoder  = new UdtEncoder(encoder);
+        if (encoder != null) {
+            this.udtEncoder = new UdtEncoder(encoder);
+        }
         this.udtController = new UdtController(this, options, connection);
         connection.getReader().setUdtController(udtController);
 
@@ -52,6 +54,10 @@ public class UdtDevice {
 
     public UdtEncoder getUdtEncoder() {
         return udtEncoder;
+    }
+
+    public void setUdtEncoder(ScreenEncoder encoder) {
+        this.udtEncoder = new UdtEncoder(encoder);
     }
 
     public int getRotation() {

@@ -25,19 +25,49 @@ public class UdtServer {
         ScreenEncoder.sSurfaceName = UdtOption.SOCKET_NAME;
         UdtLn.setTag(UdtOption.SOCKET_NAME);
 
-        boolean control = options.getControl();
         boolean sendDummyByte = options.getSendDummyByte();
-
         UdtLn.i("Start wait multi connection");
+
+        // Start control server
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    open(UdtOption.SOCKET_NAME+"-ctrl", false,
+                            new DesktopConnectionListener() {
+                                @Override
+                                public void onConnect(LocalSocket socket) {
+                                    sClientCount++;
+                                    UdtLn.i("[ctrl] on connect and current count = " + sClientCount);
+                                    try {
+                                        StreamClient client = new StreamClient(DesktopConnection.build(null, socket), options);
+                                        client.start();
+                                    } catch (IOException e) {
+                                        // ignore
+                                    }
+                                }
+                            });
+                } catch (Exception e) {
+                    // this is expected on close
+                    UdtLn.d("ctrl server stopped");
+                }
+            }
+        }).start();
+
+        // Start video server
         try {
-            open(control, sendDummyByte,
+            open(UdtOption.SOCKET_NAME+"-video", sendDummyByte,
                     new DesktopConnectionListener() {
                         @Override
-                        public void onConnect(DesktopConnection connection) {
+                        public void onConnect(LocalSocket socket) {
                             sClientCount++;
-                            UdtLn.i("on connect and current count = " + sClientCount);
-                            StreamClient client = new StreamClient(connection, options);
-                            client.start();
+                            UdtLn.i("[video] on connect and current count = " + sClientCount);
+                            try {
+                                StreamClient client = new StreamClient(DesktopConnection.build(socket, null), options);
+                                client.start();
+                            } catch (IOException e) {
+                                // ignore
+                            }
                         }
                     });
         } catch (Exception e) {
@@ -77,12 +107,14 @@ public class UdtServer {
                 return;
             }
 
+            // FIXME: 这里通过connection字段是否为空判断connection类型，后续应该重构
+            boolean isVideo = connection.getVideoFd() != null;
+
             UdtLn.i("StreamClient start for connect: " + connection);
             List<CodecOption> codecOptions = options.getCodecOptions();
-            boolean control = options.getControl();
             try {
                 final Device device = new Device(options);
-                streamScreen(connection, device, options, codecOptions, control);
+                streamScreen(connection, device, options, codecOptions, isVideo);
             } catch (IOException e) {
                 UdtLn.i("client: " + connection +
                         ", exit by IOException: " + e);
@@ -108,26 +140,39 @@ public class UdtServer {
 
     // sync with {com.genymobile.scrcpy.Server.startController()}
     private static void streamScreen(DesktopConnection connection, Device device, Options options,
-                                     List<CodecOption> codecOptions, boolean control) throws IOException {
-        if (options.getSendDeviceMeta()) {
-            Size videoSize = device.getScreenInfo().getVideoSize();
-            connection.sendDeviceMeta(Device.getDeviceName(), videoSize.getWidth(), videoSize.getHeight());
-        }
-        ScreenEncoder screenEncoder = new ScreenEncoder(options.getSendFrameMeta(), options.getBitRate(), options.getMaxFps(), codecOptions,
-                options.getEncoderName(), options.getDownsizeOnError());
-
-        Thread controllerThread = null;
-        Thread deviceMessageSenderThread = null;
-        UdtDevice udtDevice = null;
-        if (control) {
-            final Controller controller = new Controller(device, connection, options.getClipboardAutosync(), options.getPowerOn());
-            if (UdtOption.SUPPORT) {
-                udtDevice = UdtDevice.build(device, connection, screenEncoder, options);
+                                     List<CodecOption> codecOptions, boolean isVideo) throws IOException {
+        // 如果该client为video client
+        if (isVideo) {
+            if (options.getSendDeviceMeta()) {
+                Size videoSize = device.getScreenInfo().getVideoSize();
+                connection.sendDeviceMeta(Device.getDeviceName(), videoSize.getWidth(), videoSize.getHeight());
             }
 
-            // asynchronous
-            controllerThread = startController(controller, udtDevice);
-            deviceMessageSenderThread = startDeviceMessageSender(controller.getSender());
+            ScreenEncoder screenEncoder = new ScreenEncoder(options.getSendFrameMeta(), options.getBitRate(), options.getMaxFps(), codecOptions,
+                    options.getEncoderName(), options.getDownsizeOnError());
+
+            // FIXME: 这里有隐藏的风险，需要注意
+            UdtDevice udtDevice = UdtDevice.Combiner.get(device);
+            if (udtDevice != null) {
+                udtDevice.setUdtEncoder(screenEncoder);
+            }
+            try {
+                // synchronous
+                screenEncoder.streamScreen(device, connection.getVideoFd());
+            } catch (IOException e) {
+                // this is expected on close
+                UdtLn.w("Screen streaming stopped for " + connection.getVideoFd());
+            } finally {
+                // initThread.interrupt();
+            }
+        } else {
+            // 该client为control client
+            Thread controllerThread = null;
+            UdtDevice udtDevice = null;
+            final Controller controller = new Controller(device, connection, options.getClipboardAutosync(), options.getPowerOn());
+            if (UdtOption.SUPPORT) {
+                udtDevice = UdtDevice.build(device, connection, null, options);
+            }
 
             device.setClipboardListener(new Device.ClipboardListener() {
                 @Override
@@ -135,26 +180,25 @@ public class UdtServer {
                     controller.getSender().pushClipboardText(text);
                 }
             });
-        }
 
-        try {
+            // asynchronous
+            controllerThread = startController(controller, udtDevice);
+
             // synchronous
-            screenEncoder.streamScreen(device, connection.getVideoFd());
-        } catch (IOException e) {
-            // this is expected on close
-            UdtLn.w("Screen streaming stopped for " + connection.getVideoFd());
-        } finally {
-            // initThread.interrupt();
-            if (controllerThread != null) {
-                controllerThread.interrupt();
+            try {
+                controller.getSender().loop();
+            } catch (IOException | InterruptedException e) {
+                // this is expected on close
+                UdtLn.d("Device message sender stopped");
             }
-            if (deviceMessageSenderThread != null) {
-                deviceMessageSenderThread.interrupt();
-            }
+
             if (UdtOption.SUPPORT) {
                 if (udtDevice != null) {
                     udtDevice.stop();
                 }
+            }
+            if (controllerThread != null) {
+                controllerThread.interrupt();
             }
         }
     }
@@ -199,31 +243,24 @@ public class UdtServer {
     }
 
     public interface DesktopConnectionListener {
-        void onConnect(DesktopConnection connection) ;
+        void onConnect(LocalSocket socket) ;
     }
 
+    // UdtOption.SOCKET_NAME
     //NOTE: only support forward mode.
-    public static void open(boolean control, boolean sendDummyByte, DesktopConnectionListener listener) throws IOException {
-        LocalSocket videoSocket;
+    public static void open(String socketName, boolean sendDummyByte, DesktopConnectionListener listener) throws IOException {
+        LocalSocket socket;
         LocalSocket controlSocket = null;
-        LocalServerSocket localServerSocket = new LocalServerSocket(UdtOption.SOCKET_NAME);
+        LocalServerSocket localServerSocket = new LocalServerSocket(socketName);
         try {
             do {
-                videoSocket = localServerSocket.accept();
+                socket = localServerSocket.accept();
                 if (sendDummyByte) {
                     // send one byte so the client may read() to detect a connection error
-                    videoSocket.getOutputStream().write(0);
-                }
-                if (control) {
-                    try {
-                        controlSocket = localServerSocket.accept();
-                    } catch (IOException | RuntimeException e) {
-                        videoSocket.close();
-                        throw e;
-                    }
+                    socket.getOutputStream().write(0);
                 }
                 if (listener != null) {
-                    listener.onConnect(DesktopConnection.build(videoSocket, controlSocket));
+                    listener.onConnect(socket);
                 }
             } while (listener != null);
         } finally {
