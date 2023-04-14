@@ -134,7 +134,7 @@ public class UdtController {
     private void captureScreen(int height, int quality) {
         UdtLn.i("capture screen by height: " + height + ", quality" + quality);
         if (screenCapture == null) {
-            screenCapture = new ScreenCapture(connection.getVideoFd().hashCode());
+            screenCapture = new ScreenCapture(connection.getCtrlSocket().getFileDescriptor().hashCode());
         }
         screenCapture.capture(height, quality, options,
                 new ScreenCapture.OnImageAvailableListener() {

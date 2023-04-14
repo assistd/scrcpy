@@ -143,5 +143,9 @@ public final class DesktopConnection implements Closeable {
     public ControlMessageReader getReader() {
         return reader;
     }
+
+    public LocalSocket getCtrlSocket() {
+        return controlSocket;
+    }
     //*/
 }
