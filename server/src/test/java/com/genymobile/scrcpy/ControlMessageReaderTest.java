@@ -15,6 +15,10 @@ import java.util.Arrays;
 
 public class ControlMessageReaderTest {
 
+    static {
+        com.genymobile.scrcpy.udt.UdtOption.SUPPORT = false;
+    }
+
     @Test
     public void testParseKeycodeEvent() throws IOException {
         ControlMessageReader reader = new ControlMessageReader();

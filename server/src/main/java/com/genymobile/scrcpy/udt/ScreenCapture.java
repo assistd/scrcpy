@@ -95,6 +95,7 @@ public final class ScreenCapture {
         }
     }
 
+    @android.annotation.SuppressLint("WrongConstant")
     @TargetApi(Build.VERSION_CODES.KITKAT)
     public void capture(int height, int quality, Options options, OnImageAvailableListener listener) {
         options.setMaxSize(height);
