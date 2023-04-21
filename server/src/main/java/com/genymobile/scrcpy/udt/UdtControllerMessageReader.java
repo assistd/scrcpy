@@ -13,6 +13,7 @@ public class UdtControllerMessageReader {
         public static final int TYPE_SET_LOCALE     = 107;
         public static final int TYPE_GET_APPS       = 108;
         public static final int TYPE_GET_ROTATION   = 109;
+        public static final int TYPE_GET_SCREEN_INFO = 110;
 
         private int type;
         private int bitRate;
@@ -92,6 +93,7 @@ public class UdtControllerMessageReader {
             case UdtControlMessage.TYPE_GET_LOCALE:
             case UdtControlMessage.TYPE_GET_APPS:
             case UdtControlMessage.TYPE_GET_ROTATION:
+            case UdtControlMessage.TYPE_GET_SCREEN_INFO:
                 return UdtControlMessage.createEmpty(type);
             case UdtControlMessage.TYPE_SET_LOCALE:
                 return parseSetLocale(parseCallBack);

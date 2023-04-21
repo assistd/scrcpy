@@ -1,6 +1,8 @@
 package com.genymobile.scrcpy.udt;
 
 import com.genymobile.scrcpy.DesktopConnection;
+import com.genymobile.scrcpy.ScreenInfo;
+import com.genymobile.scrcpy.Size;
 import com.genymobile.scrcpy.StringUtils;
 
 import java.io.IOException;
@@ -16,6 +18,7 @@ public final class UdtSender {
     private String curLocale;
     private String appLists;
     private int rotation = -1;
+    private ScreenInfo screenInfo = null;
 
     public UdtSender(DesktopConnection connection) {
         this.connection = connection;
@@ -55,17 +58,26 @@ public final class UdtSender {
         }
     }
 
+    public synchronized void pushScreenInfo(ScreenInfo info) {
+        if (info != null) {
+            this.screenInfo = info;
+            notify();
+        }
+    }
+
     public void loop() throws IOException, InterruptedException {
         while (true) {
             byte[] image = null;
             String newLocale = null;
             String apps = null;
             int rotation = -1;
+            ScreenInfo info = null;
             synchronized (this) {
                 while (captureImage == null
                         && curLocale == null
                         && appLists == null
                         && this.rotation < 0
+                        && screenInfo == null
                 ) {
                     wait();
                 }
@@ -86,6 +98,10 @@ public final class UdtSender {
                     rotation = this.rotation;
                     this.rotation = -1;
                 }
+                if (screenInfo != null) {
+                    info = screenInfo;
+                    screenInfo = null;
+                }
             }
             if (image != null) {
                 UdtDeviceMessage event = UdtDeviceMessage.createCapture(image);
@@ -103,6 +119,10 @@ public final class UdtSender {
                 UdtDeviceMessage event = UdtDeviceMessage.createGetRotation(rotation);
                 writer.sendUdtDeviceMessage(event, connection.getOutputStream());
             }
+            if (info != null) {
+                UdtDeviceMessage event = UdtDeviceMessage.createScreenInfo(info);
+                writer.sendUdtDeviceMessage(event, connection.getOutputStream());
+            }
         }
     }
 
@@ -118,6 +138,7 @@ public final class UdtSender {
         private String curLocale;
         private String apps;
         private int rotation = -1;
+        private ScreenInfo screenInfo;
 
         public static UdtDeviceMessage createCapture(byte[] image) {
             UdtDeviceMessage event = new UdtDeviceMessage();
@@ -147,6 +168,13 @@ public final class UdtSender {
             return event;
         }
 
+        public static UdtDeviceMessage createScreenInfo(ScreenInfo screenInfo) {
+            UdtDeviceMessage event = new UdtDeviceMessage();
+            event.type = UdtControllerMessageReader.UdtControlMessage.TYPE_GET_SCREEN_INFO;
+            event.screenInfo = screenInfo;
+            return event;
+        }
+
         public int getType() {
             return type;
         }
@@ -165,6 +193,9 @@ public final class UdtSender {
 
         public int getRotation() {
             return rotation;
+        }
+        public ScreenInfo getScreenInfo() {
+            return screenInfo;
         }
     }
 
@@ -214,6 +245,14 @@ public final class UdtSender {
                 case UdtDeviceMessage.TYPE_GET_ROTATION:
                     int rotation = msg.getRotation();
                     buffer.putInt(rotation);
+                    output.write(rawBuffer, 0, buffer.position());
+                    return;
+                case UdtControllerMessageReader.UdtControlMessage.TYPE_GET_SCREEN_INFO:
+                    ScreenInfo info = msg.getScreenInfo();
+                    Size size = info.getUnlockedVideoSize();
+                    buffer.putInt(size.getWidth());
+                    buffer.putInt(size.getHeight());
+                    buffer.putInt(info.getDeviceRotation());
                     output.write(rawBuffer, 0, buffer.position());
                     return;
                 default:

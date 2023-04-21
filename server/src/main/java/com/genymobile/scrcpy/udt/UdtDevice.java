@@ -4,6 +4,7 @@ import com.genymobile.scrcpy.DesktopConnection;
 import com.genymobile.scrcpy.Device;
 import com.genymobile.scrcpy.Options;
 import com.genymobile.scrcpy.ScreenEncoder;
+import com.genymobile.scrcpy.ScreenInfo;
 
 import java.util.HashMap;
 
@@ -62,6 +63,10 @@ public class UdtDevice {
 
     public int getRotation() {
         return device.getScreenInfo().getDeviceRotation();
+    }
+
+    public ScreenInfo getScreenInfo() {
+        return device.getScreenInfo();
     }
 
     public void reqIDRFrame() {

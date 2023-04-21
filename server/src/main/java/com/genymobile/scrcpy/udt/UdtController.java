@@ -8,6 +8,7 @@ import android.view.IRotationWatcher;
 
 import com.genymobile.scrcpy.DesktopConnection;
 import com.genymobile.scrcpy.Options;
+import com.genymobile.scrcpy.ScreenInfo;
 import com.genymobile.scrcpy.wrappers.PackageManager;
 import com.genymobile.scrcpy.wrappers.ServiceManager;
 
@@ -106,6 +107,9 @@ public class UdtController {
             case UdtControlMessage.TYPE_GET_ROTATION:
                 getRotation();
                 return true;
+            case UdtControlMessage.TYPE_GET_SCREEN_INFO:
+                getScreenInfo();
+                return true;
             default:
                 UdtLn.e("unknown udt control msg, type = " + udtMsg.getType());
                 return false;
@@ -190,6 +194,12 @@ public class UdtController {
         int rotation = device.getRotation();
         UdtLn.i("get device rotation: " + rotation);
         udtSender.pushRotation(rotation);
+    }
+
+    private void getScreenInfo() {
+        ScreenInfo info = device.getScreenInfo();
+        UdtLn.i("get screen info: " + info);
+        udtSender.pushScreenInfo(info);
     }
 
     private static class RotationWatcher extends IRotationWatcher.Stub {
