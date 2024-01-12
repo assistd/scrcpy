@@ -17,6 +17,7 @@ public final class ControlMessage {
     public static final int TYPE_SET_CLIPBOARD = 9;
     public static final int TYPE_SET_SCREEN_POWER_MODE = 10;
     public static final int TYPE_ROTATE_DEVICE = 11;
+    public static final int TYPE_SEND_CURRENT_TIME = 50;
 
     public static final long SEQUENCE_INVALID = 0;
 
@@ -92,6 +93,13 @@ public final class ControlMessage {
         ControlMessage msg = new ControlMessage();
         msg.type = TYPE_GET_CLIPBOARD;
         msg.copyKey = copyKey;
+        return msg;
+    }
+
+    public static ControlMessage createSendCurrentTime(String text) {
+        ControlMessage msg = new ControlMessage();
+        msg.type = TYPE_SEND_CURRENT_TIME;
+        msg.text = text;
         return msg;
     }
 

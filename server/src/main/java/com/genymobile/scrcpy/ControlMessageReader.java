@@ -15,6 +15,7 @@ public class ControlMessageReader {
     static final int SET_SCREEN_POWER_MODE_PAYLOAD_LENGTH = 1;
     static final int GET_CLIPBOARD_LENGTH = 1;
     static final int SET_CLIPBOARD_FIXED_PAYLOAD_LENGTH = 9;
+    static final int SEND_CURRENT_TIME_LENGTH = 13;
 
     private static final int MESSAGE_MAX_SIZE = 1 << 18; // 256k
 
@@ -85,6 +86,9 @@ public class ControlMessageReader {
             case ControlMessage.TYPE_COLLAPSE_PANELS:
             case ControlMessage.TYPE_ROTATE_DEVICE:
                 msg = ControlMessage.createEmpty(type);
+                break;
+            case ControlMessage.TYPE_SEND_CURRENT_TIME:
+                msg = parseSendCurrentTime();
                 break;
             default:
                 Ln.w("Unknown event type: " + type);
@@ -172,6 +176,14 @@ public class ControlMessageReader {
         }
         int copyKey = toUnsigned(buffer.get());
         return ControlMessage.createGetClipboard(copyKey);
+    }
+
+    private ControlMessage parseSendCurrentTime() {
+        String text = parseString();
+        if (text == null) {
+            return null;
+        }
+        return ControlMessage.createSendCurrentTime(text);
     }
 
     private ControlMessage parseSetClipboard() {

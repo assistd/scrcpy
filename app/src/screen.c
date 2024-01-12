@@ -448,7 +448,8 @@ sc_screen_init(struct sc_screen *screen,
     if (params->window_borderless) {
         window_flags |= SDL_WINDOW_BORDERLESS;
     }
-
+    screen->window_title = params->window_title;
+    
     // The window will be positioned and sized on first video frame
     screen->window =
         SDL_CreateWindow(params->window_title, 0, 0, 0, 0, window_flags);

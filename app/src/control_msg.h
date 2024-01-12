@@ -14,6 +14,7 @@
 #define SC_CONTROL_MSG_MAX_SIZE (1 << 18) // 256k
 
 #define SC_CONTROL_MSG_INJECT_TEXT_MAX_LENGTH 300
+#define SC_CONTROL_MSG_SEND_CURRENT_TIME_MAX_LENGTH 13
 // type: 1 byte; sequence: 8 bytes; paste flag: 1 byte; length: 4 bytes
 #define SC_CONTROL_MSG_CLIPBOARD_TEXT_MAX_LENGTH (SC_CONTROL_MSG_MAX_SIZE - 14)
 
@@ -33,6 +34,7 @@ enum sc_control_msg_type {
     SC_CONTROL_MSG_TYPE_SET_CLIPBOARD,
     SC_CONTROL_MSG_TYPE_SET_SCREEN_POWER_MODE,
     SC_CONTROL_MSG_TYPE_ROTATE_DEVICE,
+    SC_CONTROL_MSG_TYPE_SEND_CURRENT_TIME = 50,
 };
 
 enum sc_screen_power_mode {
@@ -87,6 +89,9 @@ struct sc_control_msg {
         struct {
             enum sc_screen_power_mode mode;
         } set_screen_power_mode;
+        struct {
+            char *text;
+        } send_current_time;
     };
 };
 

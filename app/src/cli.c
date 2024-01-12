@@ -656,6 +656,10 @@ static const struct sc_shortcut shortcuts[] = {
         .text = "Cut to clipboard (inject CUT keycode, Android >= 7 only)",
     },
     {
+        .shortcuts = { "MOD+t" },
+        .text = "Send current time",
+    },
+    {
         .shortcuts = { "MOD+v" },
         .text = "Copy computer clipboard to device, then paste (inject PASTE "
                 "keycode, Android >= 7 only)",

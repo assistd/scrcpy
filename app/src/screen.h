@@ -41,6 +41,7 @@ struct sc_screen {
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Texture *texture;
+    const char *window_title;
     struct sc_opengl gl;
     struct sc_size frame_size;
     struct sc_size content_size; // rotated frame_size

@@ -136,6 +136,8 @@ public class Controller {
             case ControlMessage.TYPE_ROTATE_DEVICE:
                 Device.rotateDevice();
                 break;
+            case ControlMessage.TYPE_SEND_CURRENT_TIME:
+                break;
             default:
                 // do nothing
         }

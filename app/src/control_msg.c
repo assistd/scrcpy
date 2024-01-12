@@ -143,6 +143,12 @@ sc_control_msg_serialize(const struct sc_control_msg *msg, unsigned char *buf) {
         case SC_CONTROL_MSG_TYPE_ROTATE_DEVICE:
             // no additional data
             return 1;
+        case SC_CONTROL_MSG_TYPE_SEND_CURRENT_TIME: {
+            size_t len =
+                write_string(msg->inject_text.text,
+                             SC_CONTROL_MSG_SEND_CURRENT_TIME_MAX_LENGTH, &buf[1]);
+            return 1 + len;
+        }
         default:
             LOGW("Unknown message type: %u", (unsigned) msg->type);
             return 0;

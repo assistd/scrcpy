@@ -1,11 +1,12 @@
 #include "input_manager.h"
-
+#include <sys/time.h>
 #include <assert.h>
 #include <SDL2/SDL_keycode.h>
 
 #include "input_events.h"
 #include "screen.h"
 #include "util/log.h"
+#include "util/strbuf.h"
 
 #define SC_SDL_SHORTCUT_MODS_MASK (KMOD_CTRL | KMOD_ALT | KMOD_GUI)
 
@@ -304,6 +305,29 @@ rotate_client_right(struct sc_screen *screen) {
     sc_screen_set_rotation(screen, new_rotation);
 }
 
+long long getMilliseconds() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return ((long long)tv.tv_sec) * 1000 + ((long long)tv.tv_usec) / 1000;
+}
+
+static void
+send_current_time(struct sc_controller *controller, const char *current_time) {
+    char *text_dup = strdup(current_time);
+    if (!text_dup) {
+        LOGW("Could not strdup input text");
+        return;
+    }
+
+    struct sc_control_msg msg;
+    msg.type = SC_CONTROL_MSG_TYPE_SEND_CURRENT_TIME;
+    msg.inject_text.text = text_dup;
+    if (!sc_controller_push_msg(controller, &msg)) {
+        free(text_dup);
+        LOGW("Could not request 'send current time'");
+    }
+}
+
 static void
 sc_input_manager_process_text_input(struct sc_input_manager *im,
                                     const SDL_TextInputEvent *event) {
@@ -362,6 +386,7 @@ sc_input_manager_process_key(struct sc_input_manager *im,
 
     SDL_Keycode keycode = event->keysym.sym;
     uint16_t mod = event->keysym.mod;
+    bool up = event->type == SDL_KEYUP;
     bool down = event->type == SDL_KEYDOWN;
     bool ctrl = event->keysym.mod & KMOD_CTRL;
     bool shift = event->keysym.mod & KMOD_SHIFT;
@@ -496,6 +521,35 @@ sc_input_manager_process_key(struct sc_input_manager *im,
             case SDLK_r:
                 if (controller && !shift && !repeat && down) {
                     rotate_device(controller);
+                }
+                return;
+            case SDLK_t:
+                if (controller && !shift && (up || down)) {
+                    long long current_time = getMilliseconds();
+                    char timestamp[20];
+                    snprintf(timestamp, sizeof(timestamp), "%lld", (long long)current_time);
+                    time_t t = (time_t)current_time/1000;
+                    struct tm* time_info = localtime(&t);
+                    int hours = time_info->tm_hour;
+                    int minutes = time_info->tm_min;
+                    int seconds = time_info->tm_sec;
+                    char current_format_time[20];
+                    snprintf(current_format_time, sizeof(current_format_time), "%02d:%02d:%02d", hours, minutes, seconds);
+                    size_t window_title_size = strlen(im->screen->window_title);
+                    struct sc_strbuf buf;
+                    const char* upload_symbol = up ? "↑" : "";
+                    sc_strbuf_init(&buf, window_title_size + 19);
+                    sc_strbuf_append(&buf, im->screen->window_title, window_title_size);
+                    sc_strbuf_append_char(&buf, ' ');
+                    sc_strbuf_append_char(&buf, '[');
+                    sc_strbuf_append(&buf, upload_symbol, strlen(upload_symbol));
+                    sc_strbuf_append(&buf, current_format_time, strlen(current_format_time));
+                    sc_strbuf_append_char(&buf, ']');
+                    SDL_SetWindowTitle(im->screen->window, buf.s);
+                    if (up) {
+                        send_current_time(controller, timestamp);
+                    }
+                    free(buf.s);
                 }
                 return;
         }
