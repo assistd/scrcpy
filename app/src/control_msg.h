@@ -33,6 +33,7 @@ enum sc_control_msg_type {
     SC_CONTROL_MSG_TYPE_SET_CLIPBOARD,
     SC_CONTROL_MSG_TYPE_SET_SCREEN_POWER_MODE,
     SC_CONTROL_MSG_TYPE_ROTATE_DEVICE,
+    SC_CONTROL_MSG_TYPE_GET_CURRENT_TIME = 99,
 };
 
 enum sc_screen_power_mode {

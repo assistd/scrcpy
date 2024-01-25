@@ -14,6 +14,7 @@
 enum device_msg_type {
     DEVICE_MSG_TYPE_CLIPBOARD,
     DEVICE_MSG_TYPE_ACK_CLIPBOARD,
+    DEVICE_MSG_TYPE_SEND_CURRENT_TIME = 101,
 };
 
 struct device_msg {
@@ -25,6 +26,9 @@ struct device_msg {
         struct {
             uint64_t sequence;
         } ack_clipboard;
+        struct {
+            char *text;
+        } send_current_time;
     };
 };
 

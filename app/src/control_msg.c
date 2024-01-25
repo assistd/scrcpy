@@ -141,6 +141,7 @@ sc_control_msg_serialize(const struct sc_control_msg *msg, unsigned char *buf) {
         case SC_CONTROL_MSG_TYPE_EXPAND_SETTINGS_PANEL:
         case SC_CONTROL_MSG_TYPE_COLLAPSE_PANELS:
         case SC_CONTROL_MSG_TYPE_ROTATE_DEVICE:
+        case SC_CONTROL_MSG_TYPE_GET_CURRENT_TIME:
             // no additional data
             return 1;
         default:

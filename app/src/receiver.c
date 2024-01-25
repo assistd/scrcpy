@@ -1,8 +1,11 @@
 #include "receiver.h"
 
 #include <assert.h>
+
+#include <SDL2/SDL.h>
 #include <SDL2/SDL_clipboard.h>
 
+#include "events.h"
 #include "device_msg.h"
 #include "util/log.h"
 
@@ -26,6 +29,17 @@ receiver_destroy(struct receiver *receiver) {
 }
 
 static void
+sc_screen_window_title(char *current_time) {
+    SDL_Event event;
+    event.type = EVENT_SCREEN_WINDOW_TITLE;
+    event.user.data1 = current_time;
+    int ret = SDL_PushEvent(&event);
+    if (ret < 0) {
+        LOGE("Could not post screen window title event: %s", SDL_GetError());
+    }
+}
+
+static void
 process_msg(struct receiver *receiver, struct device_msg *msg) {
     switch (msg->type) {
         case DEVICE_MSG_TYPE_CLIPBOARD: {
@@ -46,6 +60,9 @@ process_msg(struct receiver *receiver, struct device_msg *msg) {
             LOGD("Ack device clipboard sequence=%" PRIu64_,
                  msg->ack_clipboard.sequence);
             sc_acksync_ack(receiver->acksync, msg->ack_clipboard.sequence);
+            break;
+        case DEVICE_MSG_TYPE_SEND_CURRENT_TIME:
+            sc_screen_window_title(msg->send_current_time.text);
             break;
     }
 }
