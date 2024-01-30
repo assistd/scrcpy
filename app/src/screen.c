@@ -9,6 +9,7 @@
 #include "options.h"
 #include "video_buffer.h"
 #include "util/log.h"
+#include "util/strbuf.h"
 
 #define DISPLAY_MARGINS 96
 
@@ -448,7 +449,8 @@ sc_screen_init(struct sc_screen *screen,
     if (params->window_borderless) {
         window_flags |= SDL_WINDOW_BORDERLESS;
     }
-
+    screen->window_title = params->window_title;
+    
     // The window will be positioned and sized on first video frame
     screen->window =
         SDL_CreateWindow(params->window_title, 0, 0, 0, 0, window_flags);
@@ -827,6 +829,10 @@ sc_screen_handle_event(struct sc_screen *screen, SDL_Event *event) {
             }
             return;
         }
+        case EVENT_SCREEN_WINDOW_TITLE: {
+            sc_screen_set_window_title(screen, event->user.data1);
+            return;
+        }
         case SDL_WINDOWEVENT:
             if (!screen->has_frame) {
                 // Do nothing
@@ -977,4 +983,20 @@ sc_screen_hidpi_scale_coords(struct sc_screen *screen, int32_t *x, int32_t *y) {
     // scale for HiDPI (64 bits for intermediate multiplications)
     *x = (int64_t) *x * dw / ww;
     *y = (int64_t) *y * dh / wh;
+}
+
+void
+sc_screen_set_window_title(struct sc_screen *screen, char *current_time) {
+    size_t window_title_size = strlen(screen->window_title);
+    size_t current_time_size = strlen(current_time);
+    struct sc_strbuf buf;
+    sc_strbuf_init(&buf, window_title_size + current_time_size + 5);
+    sc_strbuf_append(&buf, screen->window_title, window_title_size);
+    sc_strbuf_append_char(&buf, ' ');
+    sc_strbuf_append_char(&buf, '[');
+    sc_strbuf_append(&buf, current_time, current_time_size);
+    sc_strbuf_append_char(&buf, ']');
+    SDL_SetWindowTitle(screen->window, buf.s);
+    free(current_time);
+    free(buf.s);
 }

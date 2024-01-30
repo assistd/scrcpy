@@ -41,6 +41,7 @@ struct sc_screen {
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Texture *texture;
+    const char *window_title;
     struct sc_opengl gl;
     struct sc_size frame_size;
     struct sc_size content_size; // rotated frame_size
@@ -162,4 +163,7 @@ sc_screen_convert_drawable_to_frame_coords(struct sc_screen *screen,
 void
 sc_screen_hidpi_scale_coords(struct sc_screen *screen, int32_t *x, int32_t *y);
 
+// set window title
+void
+sc_screen_set_window_title(struct sc_screen *screen, char *current_time);
 #endif

@@ -40,6 +40,25 @@ device_msg_deserialize(const unsigned char *buf, size_t len,
             msg->ack_clipboard.sequence = sequence;
             return 9;
         }
+        case DEVICE_MSG_TYPE_SEND_CURRENT_TIME: {
+            size_t current_time_len = sc_read32be(&buf[1]);
+            if (current_time_len > len - 5) {
+                return 0; // not available
+            }
+            char *text = malloc(current_time_len + 1);
+            if (!text) {
+                LOG_OOM();
+                return -1;
+            }
+            if (current_time_len) {
+                memcpy(text, &buf[5], current_time_len);
+            }
+
+            text[current_time_len] = '\0';
+
+            msg->send_current_time.text = text;
+            return 5 + current_time_len;
+        }
         default:
             LOGW("Unknown device message type: %d", (int) msg->type);
             return -1; // error, we cannot recover

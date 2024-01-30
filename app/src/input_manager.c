@@ -305,6 +305,16 @@ rotate_client_right(struct sc_screen *screen) {
 }
 
 static void
+get_current_time(struct sc_controller *controller) {
+    struct sc_control_msg msg;
+    msg.type = SC_CONTROL_MSG_TYPE_GET_CURRENT_TIME;
+
+    if (!sc_controller_push_msg(controller, &msg)) {
+        LOGW("Could not request get current time");
+    }
+}
+
+static void
 sc_input_manager_process_text_input(struct sc_input_manager *im,
                                     const SDL_TextInputEvent *event) {
     if (!im->kp->ops->process_text) {
@@ -496,6 +506,11 @@ sc_input_manager_process_key(struct sc_input_manager *im,
             case SDLK_r:
                 if (controller && !shift && !repeat && down) {
                     rotate_device(controller);
+                }
+                return;
+            case SDLK_t:
+                if (controller && !shift && !repeat && down) {
+                    get_current_time(controller);
                 }
                 return;
         }
